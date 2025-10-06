@@ -1,4 +1,4 @@
--- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Infinite Stamina ===
+-- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Stamina Bloqueada ===
 
 -- SERVICIOS
 local CoreGui = game:GetService("CoreGui")
@@ -14,7 +14,7 @@ local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
 -- =========================================================================================================
---                                          ⚙️ LÓGICA DE SHIFTLOCK
+-- ⚙️ LÓGICA DE SHIFTLOCK
 -- =========================================================================================================
 
 local ShiftLockScreenGui = Instance.new("ScreenGui")
@@ -285,10 +285,11 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- =========================================================================================================
--- ♾️ STAMINA INFINITA UNIVERSAL
+-- 💪 STAMINA BLOQUEADA EN 100
 -- =========================================================================================================
 
-local playerName = player.Name -- se usa automáticamente el nombre del jugador local
+local localPlayer = Players.LocalPlayer
+local playerName = localPlayer.Name
 
 local possibleFolders = {
 	Workspace:WaitForChild("Students"),
@@ -306,15 +307,29 @@ local function findPlayerModel()
 	return nil, nil
 end
 
-local function applyInfiniteStamina(playerModel)
+local function lockStamina(playerModel)
 	if not playerModel then return end
+
 	if playerModel:GetAttribute("MaxStamina") ~= nil then
-		playerModel:SetAttribute("MaxStamina", math.huge)
+		playerModel:SetAttribute("MaxStamina", 100)
 	end
 	if playerModel:GetAttribute("Stamina") ~= nil then
-		playerModel:SetAttribute("Stamina", math.huge)
+		playerModel:SetAttribute("Stamina", 100)
 	end
-	print("[✅] Stamina infinita aplicada a " .. playerModel.Name)
+
+	playerModel:GetAttributeChangedSignal("Stamina"):Connect(function()
+		if playerModel:GetAttribute("Stamina") ~= 100 then
+			playerModel:SetAttribute("Stamina", 100)
+		end
+	end)
+
+	playerModel:GetAttributeChangedSignal("MaxStamina"):Connect(function()
+		if playerModel:GetAttribute("MaxStamina") ~= 100 then
+			playerModel:SetAttribute("MaxStamina", 100)
+		end
+	end)
+
+	print("[✅] Stamina bloqueada en 100 para " .. playerModel.Name)
 end
 
 local function setupCharacterListener(model)
@@ -325,7 +340,7 @@ local function setupCharacterListener(model)
 			task.wait(1)
 			local newModel = findPlayerModel()
 			if newModel then
-				applyInfiniteStamina(newModel)
+				lockStamina(newModel)
 				setupCharacterListener(newModel)
 			end
 		end)
@@ -334,7 +349,7 @@ end
 
 local playerModel = findPlayerModel()
 if playerModel then
-	applyInfiniteStamina(playerModel)
+	lockStamina(playerModel)
 	setupCharacterListener(playerModel)
 else
 	warn("⚠️ No se encontró el jugador en Students, Teachers ni Alices.")
@@ -344,7 +359,7 @@ for _, folder in ipairs(possibleFolders) do
 	folder.ChildAdded:Connect(function(child)
 		if child.Name == playerName then
 			task.wait(1)
-			applyInfiniteStamina(child)
+			lockStamina(child)
 			setupCharacterListener(child)
 		end
 	end)
