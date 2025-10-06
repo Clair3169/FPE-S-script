@@ -1,4 +1,4 @@
--- === Script Unificado: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control ===
+-- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Infinite Stamina ===
 
 -- SERVICIOS
 local CoreGui = game:GetService("CoreGui")
@@ -17,7 +17,6 @@ local camera = Workspace.CurrentCamera
 --                                          ⚙️ LÓGICA DE SHIFTLOCK
 -- =========================================================================================================
 
--- INSTANCIAS DE SHIFTLOCK
 local ShiftLockScreenGui = Instance.new("ScreenGui")
 local ShiftLockButton = Instance.new("ImageButton")
 local ShiftlockCursor = Instance.new("ImageLabel")
@@ -33,7 +32,6 @@ local EnabledOffset = CFrame.new(1.7, 0, 0)
 local DisabledOffset = CFrame.new(-1.7, 0, 0)
 local Active
 
--- CONFIGURACIÓN DE GUI
 ShiftLockScreenGui.Name = "Shiftlock (CoreGui)"
 ShiftLockScreenGui.Parent = CoreGui
 ShiftLockScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -41,7 +39,7 @@ ShiftLockScreenGui.ResetOnSpawn = false
 
 ShiftLockButton.Parent = ShiftLockScreenGui
 ShiftLockButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-ShiftLockButton.BackgroundTransparency = 1.000
+ShiftLockButton.BackgroundTransparency = 1
 ShiftLockButton.AnchorPoint = Vector2.new(1, 1)
 ShiftLockButton.Position = UDim2.new(1, 0, 1, 0)
 ShiftLockButton.Size = UDim2.new(0.08, 0, 0.08, 0)
@@ -52,16 +50,16 @@ ShiftlockCursor.Name = "Shiftlock Cursor"
 ShiftlockCursor.Parent = ShiftLockScreenGui
 ShiftlockCursor.Image = States.Lock
 ShiftlockCursor.Size = UDim2.new(0.03, 0, 0.03, 0)
-ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.400000006, 7)
+ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.4, 7)
 ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
 ShiftlockCursor.SizeConstraint = Enum.SizeConstraint.RelativeXX
 ShiftlockCursor.BackgroundTransparency = 1
 ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 ShiftlockCursor.Visible = false
 
--- LÓGICA DE OJO FAKE
-local frame = Workspace.Debris.FakeCursor.Attachment.BillboardGui.Frame
-local uiStroke = frame:FindFirstChildOfClass("UIStroke")
+-- Ojo Fake
+local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
+local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
 
 if uiStroke then
     uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
@@ -71,7 +69,6 @@ if uiStroke then
     end)
 end
 
--- LÓGICA DE BOTÓN Y CURSOR
 ShiftLockButton.MouseButton1Click:Connect(function()
     if not Active then
         Active = RunService.RenderStepped:Connect(function()
@@ -122,30 +119,29 @@ local ShiftLockAction = ContextActionService:BindAction("Shift Lock", ShiftLock,
 ContextActionService:SetPosition("Shift Lock", UDim2.new(1, -70, 1, -70))
 
 -- =========================================================================================================
---                                          👤 LÓGICA DE ICONOS FLOTANTES Y CÁMARA
+-- 👤 ICONOS FLOTANTES Y CÁMARA
 -- =========================================================================================================
 
--- FOLDERS
 local TeachersFolder = Workspace:WaitForChild("Teachers")
 local AlicesFolder = Workspace:WaitForChild("Alices")
 
--- IMÁGENES DE TEACHERS / ALICES
 local teacherImages = {
 	Thavel = "rbxassetid://126007170470250",
 	Bloomie = "rbxassetid://116769479448758",
 	Circle = "rbxassetid://72842137403522",
 	Alice = "rbxassetid://94023609108845",
-	AlicePhase2 = "rbxassetid://78066130044573"
+	AlicePhase2 = "rbxassetid://78066130044573" -- Icono ajustado tamaño mediano-grande
 }
 local enragedImage = "rbxassetid://108867117884833"
 
--- FUNCIONES DE ICONOS FLOTANTES
 local function createFloatingImage(head, imageId)
 	if head:FindFirstChild("TeacherBillboard") then return end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "TeacherBillboard"
-	billboard.Size = UDim2.new(4, 0, 4, 0)
+
+	local size = (imageId == teacherImages.AlicePhase2) and 6 or 4
+	billboard.Size = UDim2.new(size, 0, size, 0)
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0
 	billboard.StudsOffset = Vector3.new(0, 2.7, 0)
@@ -165,7 +161,7 @@ local function createFloatingImage(head, imageId)
 		local camPos = camera.CFrame.Position
 		local distance = (headPos - camPos).Magnitude
 		local scale = math.clamp(distance / 25, 0.8, 3.5)
-		billboard.Size = UDim2.new(4 * scale, 0, 4 * scale, 0)
+		billboard.Size = UDim2.new(size * scale, 0, size * scale, 0)
 	end)
 end
 
@@ -186,7 +182,7 @@ local function monitorEnraged(model)
 	model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
 end
 
-local function processCharacter(model, isTeacher)
+local function processCharacter(model)
     if not model:IsA("Model") then return end
     local head = model:FindFirstChild("Head")
     if not head then return end
@@ -207,43 +203,39 @@ local function isLocalInFolders()
 	return TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name)
 end
 
--- Procesar existentes
 for _, t in ipairs(TeachersFolder:GetChildren()) do
     if not isLocalInFolders() or t.Name ~= player.Name then
-        processCharacter(t, true)
+        processCharacter(t)
     end
 end
 for _, a in ipairs(AlicesFolder:GetChildren()) do
     if not isLocalInFolders() or a.Name ~= player.Name then
-        processCharacter(a, false)
+        processCharacter(a)
     end
 end
 
--- Detectar nuevos añadidos
 TeachersFolder.ChildAdded:Connect(function(child)
     task.wait(1)
     if not isLocalInFolders() or child.Name ~= player.Name then
-        processCharacter(child, true)
+        processCharacter(child)
     end
 end)
 AlicesFolder.ChildAdded:Connect(function(child)
     task.wait(1)
     if not isLocalInFolders() or child.Name ~= player.Name then
-        processCharacter(child, false)
+        processCharacter(child)
     end
 end)
 
--- === CONTROL DE CÁMARA CONSTANTE ===
+-- === CONTROL DE CÁMARA ===
 local MIN_ZOOM = 6
 local MAX_ZOOM = 100
-
 local function forceThirdPerson(plr)
 	plr.CameraMode = Enum.CameraMode.Classic
 	plr.CameraMinZoomDistance = MIN_ZOOM
 	plr.CameraMaxZoomDistance = MAX_ZOOM
 end
 
--- Forzar tercera persona
 task.spawn(function()
 	while task.wait(1) do
 		for _, plr in ipairs(Players:GetPlayers()) do
@@ -261,7 +253,6 @@ Players.PlayerAdded:Connect(function(plr)
 		forceThirdPerson(plr)
 	end)
 end)
-
 for _, plr in ipairs(Players:GetPlayers()) do
 	forceThirdPerson(plr)
 	plr.CharacterAdded:Connect(function()
@@ -271,10 +262,9 @@ for _, plr in ipairs(Players:GetPlayers()) do
 end
 
 -- =========================================================================================================
---                                          🧹 LIMPIEZA Y AJUSTES
+-- 🧹 LIMPIEZA Y AJUSTES
 -- =========================================================================================================
 
--- LIMPIAR LEADERBOARD
 local area = Workspace:WaitForChild("Area")
 local map = area:WaitForChild("Map")
 local leaderboard = map:WaitForChild("Leaderboard")
@@ -286,17 +276,78 @@ leaderboard.ChildAdded:Connect(function(child)
 	child:Destroy()
 end)
 
--- DESACTIVAR EFECTOS DE OSCURECIMIENTO
 local blackout = Lighting:FindFirstChild("BlackoutColorCorrection")
 local darkness = Lighting:FindFirstChild("DarknessColorCorrection")
 
 RunService.RenderStepped:Connect(function()
-	if blackout and blackout.Enabled then
-		blackout.Enabled = false
-	end
-	if darkness and darkness.Enabled then
-		darkness.Enabled = false
-	end
+	if blackout and blackout.Enabled then blackout.Enabled = false end
+	if darkness and darkness.Enabled then darkness.Enabled = false end
 end)
+
+-- =========================================================================================================
+-- ♾️ STAMINA INFINITA UNIVERSAL
+-- =========================================================================================================
+
+local playerName = player.Name -- se usa automáticamente el nombre del jugador local
+
+local possibleFolders = {
+	Workspace:WaitForChild("Students"),
+	Workspace:WaitForChild("Teachers"),
+	Workspace:WaitForChild("Alices")
+}
+
+local function findPlayerModel()
+	for _, folder in ipairs(possibleFolders) do
+		local model = folder:FindFirstChild(playerName)
+		if model then
+			return model, folder
+		end
+	end
+	return nil, nil
+end
+
+local function applyInfiniteStamina(playerModel)
+	if not playerModel then return end
+	if playerModel:GetAttribute("MaxStamina") ~= nil then
+		playerModel:SetAttribute("MaxStamina", math.huge)
+	end
+	if playerModel:GetAttribute("Stamina") ~= nil then
+		playerModel:SetAttribute("Stamina", math.huge)
+	end
+	print("[✅] Stamina infinita aplicada a " .. playerModel.Name)
+end
+
+local function setupCharacterListener(model)
+	if not model then return end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.Died:Connect(function()
+			task.wait(1)
+			local newModel = findPlayerModel()
+			if newModel then
+				applyInfiniteStamina(newModel)
+				setupCharacterListener(newModel)
+			end
+		end)
+	end
+end
+
+local playerModel = findPlayerModel()
+if playerModel then
+	applyInfiniteStamina(playerModel)
+	setupCharacterListener(playerModel)
+else
+	warn("⚠️ No se encontró el jugador en Students, Teachers ni Alices.")
+end
+
+for _, folder in ipairs(possibleFolders) do
+	folder.ChildAdded:Connect(function(child)
+		if child.Name == playerName then
+			task.wait(1)
+			applyInfiniteStamina(child)
+			setupCharacterListener(child)
+		end
+	end)
+end
 
 return {} and ShiftLockAction
