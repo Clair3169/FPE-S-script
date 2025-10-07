@@ -1,4 +1,4 @@
--- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Running True ===
+-- === Script Unificado: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Running True ===
 
 -- SERVICIOS
 local CoreGui = game:GetService("CoreGui")
@@ -14,7 +14,7 @@ local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
 -- =========================================================================================================
--- ⚙️ LÓGICA DE SHIFTLOCK
+--                                          ⚙️ LÓGICA DE SHIFTLOCK
 -- =========================================================================================================
 
 local ShiftLockScreenGui = Instance.new("ScreenGui")
@@ -24,7 +24,8 @@ local ShiftlockCursor = Instance.new("ImageLabel")
 local States = {
     Off = "rbxasset://textures/ui/mouseLock_off@2x.png",
     On = "rbxasset://textures/ui/mouseLock_on@2x.png",
-    Lock = "rbxasset://textures/MouseLockedCursor.png"
+    Lock = "rbxasset://textures/MouseLockedCursor.png",
+    Lock2 = "rbxasset://SystemCursors/Cross"
 }
 local MaxLength = 900000
 local EnabledOffset = CFrame.new(1.7, 0, 0)
@@ -53,8 +54,8 @@ ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
 ShiftlockCursor.BackgroundTransparency = 1
 ShiftlockCursor.Visible = false
 
-local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
-local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
+local frame = Workspace.Debris.FakeCursor.Attachment.BillboardGui.Frame
+local uiStroke = frame:FindFirstChildOfClass("UIStroke")
 
 if uiStroke then
 	uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
@@ -109,6 +110,10 @@ ShiftLockButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+local function ShiftLock() end
+local ShiftLockAction = ContextActionService:BindAction("Shift Lock", ShiftLock, false, "On")
+ContextActionService:SetPosition("Shift Lock", UDim2.new(1, -70, 1, -70))
+
 -- =========================================================================================================
 -- 👤 ICONOS FLOTANTES Y CÁMARA
 -- =========================================================================================================
@@ -125,34 +130,81 @@ local teacherImages = {
 }
 local enragedImage = "rbxassetid://108867117884833"
 
-local function createFloatingImage(head, imageId)
+local function createFloatingImage(head, imageId, isAlicePhase2)
 	if head:FindFirstChild("TeacherBillboard") then return end
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "TeacherBillboard"
-	local size = (imageId == teacherImages.AlicePhase2) and 6 or 4
-	billboard.Size = UDim2.new(size, 0, size, 0)
+	billboard.Size = UDim2.new(isAlicePhase2 and 6 or 4, 0, isAlicePhase2 and 6 or 4, 0)
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0
 	billboard.StudsOffset = Vector3.new(0, 2.7, 0)
 	billboard.Parent = head
+
 	local imageLabel = Instance.new("ImageLabel")
 	imageLabel.Name = "Icon"
 	imageLabel.Size = UDim2.new(1, 0, 1, 0)
 	imageLabel.BackgroundTransparency = 1
 	imageLabel.Image = imageId
 	imageLabel.Parent = billboard
+
 	RunService.RenderStepped:Connect(function()
 		if not billboard or not head or not head.Parent then return end
 		local headPos = head.Position
 		local camPos = camera.CFrame.Position
 		local distance = (headPos - camPos).Magnitude
 		local scale = math.clamp(distance / 25, 0.8, 3.5)
-		billboard.Size = UDim2.new(size * scale, 0, size * scale, 0)
+		billboard.Size = UDim2.new((isAlicePhase2 and 6 or 4) * scale, 0, (isAlicePhase2 and 6 or 4) * scale, 0)
 	end)
 end
 
+local function monitorEnraged(model)
+	local head = model:FindFirstChild("Head")
+	if not head then return end
+	local billboard = head:FindFirstChild("TeacherBillboard")
+	if not billboard then return end
+	local icon = billboard:FindFirstChild("Icon")
+	if not icon then return end
+
+	local function updateImage()
+		local enraged = model:GetAttribute("Enraged")
+		icon.Image = (enraged == true) and enragedImage or teacherImages["Circle"]
+	end
+
+	updateImage()
+	model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
+end
+
+local function processCharacter(model)
+	if not model:IsA("Model") then return end
+	local head = model:FindFirstChild("Head")
+	if not head then return end
+
+	local teacherName = model:GetAttribute("TeacherName")
+	if not teacherName then return end
+
+	local imageId = teacherImages[teacherName]
+	if imageId then
+		createFloatingImage(head, imageId, teacherName == "AlicePhase2")
+		if teacherName == "Circle" then
+			monitorEnraged(model)
+		end
+	end
+end
+
+for _, t in ipairs(TeachersFolder:GetChildren()) do processCharacter(t) end
+for _, a in ipairs(AlicesFolder:GetChildren()) do processCharacter(a) end
+
+TeachersFolder.ChildAdded:Connect(function(child)
+	task.wait(1)
+	processCharacter(child)
+end)
+AlicesFolder.ChildAdded:Connect(function(child)
+	task.wait(1)
+	processCharacter(child)
+end)
+
 -- =========================================================================================================
--- 🎥 CONTROL DE CÁMARA EN TERCERA PERSONA
+-- 🎥 CONTROL DE CÁMARA
 -- =========================================================================================================
 
 local MIN_ZOOM = 6
@@ -214,11 +266,8 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- =========================================================================================================
--- 🏃 RUNNING SIEMPRE TRUE
+-- 🏃 NUEVA SECCIÓN: FORZAR RUNNING TRUE
 -- =========================================================================================================
-
-local localPlayer = Players.LocalPlayer
-local playerName = localPlayer.Name
 
 local possibleFolders = {
 	Workspace:WaitForChild("Students"),
@@ -228,7 +277,7 @@ local possibleFolders = {
 
 local function findPlayerModel()
 	for _, folder in ipairs(possibleFolders) do
-		local model = folder:FindFirstChild(playerName)
+		local model = folder:FindFirstChild(player.Name)
 		if model then
 			return model
 		end
@@ -241,19 +290,16 @@ local function forceRunningTrue(playerModel)
 	if playerModel:GetAttribute("Running") ~= nil then
 		playerModel:SetAttribute("Running", true)
 	end
-
 	playerModel:GetAttributeChangedSignal("Running"):Connect(function()
 		if playerModel:GetAttribute("Running") ~= true then
 			playerModel:SetAttribute("Running", true)
 		end
 	end)
-
-	print("[✅] Running forzado en true para:", playerModel.Name)
+	print("[✅] Running forzado en true para " .. playerModel.Name)
 end
 
 local function setupCharacterListener(model)
 	if not model then return end
-	forceRunningTrue(model)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Died:Connect(function()
@@ -277,7 +323,7 @@ end
 
 for _, folder in ipairs(possibleFolders) do
 	folder.ChildAdded:Connect(function(child)
-		if child.Name == playerName then
+		if child.Name == player.Name then
 			task.wait(1)
 			forceRunningTrue(child)
 			setupCharacterListener(child)
@@ -285,4 +331,4 @@ for _, folder in ipairs(possibleFolders) do
 	end)
 end
 
-return {}
+return {} and ShiftLockAction
