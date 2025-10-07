@@ -1,4 +1,4 @@
--- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Stamina Bloqueada + Running True ===
+-- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Running True ===
 
 -- SERVICIOS
 local CoreGui = game:GetService("CoreGui")
@@ -152,6 +152,45 @@ local function createFloatingImage(head, imageId)
 end
 
 -- =========================================================================================================
+-- 🎥 CONTROL DE CÁMARA EN TERCERA PERSONA
+-- =========================================================================================================
+
+local MIN_ZOOM = 6
+local MAX_ZOOM = 100
+
+local function forceThirdPerson(plr)
+	plr.CameraMode = Enum.CameraMode.Classic
+	plr.CameraMinZoomDistance = MIN_ZOOM
+	plr.CameraMaxZoomDistance = MAX_ZOOM
+end
+
+task.spawn(function()
+	while task.wait(1) do
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr.CameraMode == Enum.CameraMode.LockFirstPerson then
+				forceThirdPerson(plr)
+			end
+		end
+	end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+	forceThirdPerson(plr)
+	plr.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		forceThirdPerson(plr)
+	end)
+end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	forceThirdPerson(plr)
+	plr.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		forceThirdPerson(plr)
+	end)
+end
+
+-- =========================================================================================================
 -- 🧹 LIMPIEZA Y AJUSTES
 -- =========================================================================================================
 
@@ -175,7 +214,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- =========================================================================================================
--- 💪 STAMINA BLOQUEADA EN 100 + RUNNING TRUE
+-- 🏃 RUNNING SIEMPRE TRUE
 -- =========================================================================================================
 
 local localPlayer = Players.LocalPlayer
@@ -197,53 +236,31 @@ local function findPlayerModel()
 	return nil
 end
 
--- Bloquear stamina y mantener running en true
-local function lockStaminaAndRunning(playerModel)
+local function forceRunningTrue(playerModel)
 	if not playerModel then return end
-
-	-- Mantener stamina fija en 100
-	if playerModel:GetAttribute("MaxStamina") ~= nil then
-		playerModel:SetAttribute("MaxStamina", 100)
-	end
-	if playerModel:GetAttribute("Stamina") ~= nil then
-		playerModel:SetAttribute("Stamina", 100)
-	end
-
-	-- Mantener "Running" siempre en true
 	if playerModel:GetAttribute("Running") ~= nil then
 		playerModel:SetAttribute("Running", true)
 	end
 
-	-- Volver a bloquear si cambian
-	playerModel:GetAttributeChangedSignal("Stamina"):Connect(function()
-		if playerModel:GetAttribute("Stamina") ~= 100 then
-			playerModel:SetAttribute("Stamina", 100)
-		end
-	end)
-	playerModel:GetAttributeChangedSignal("MaxStamina"):Connect(function()
-		if playerModel:GetAttribute("MaxStamina") ~= 100 then
-			playerModel:SetAttribute("MaxStamina", 100)
-		end
-	end)
 	playerModel:GetAttributeChangedSignal("Running"):Connect(function()
 		if playerModel:GetAttribute("Running") ~= true then
 			playerModel:SetAttribute("Running", true)
 		end
 	end)
 
-	print("[✅] Stamina bloqueada y Running forzado en true para:", playerModel.Name)
+	print("[✅] Running forzado en true para:", playerModel.Name)
 end
 
 local function setupCharacterListener(model)
 	if not model then return end
-	lockStaminaAndRunning(model)
+	forceRunningTrue(model)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Died:Connect(function()
 			task.wait(1)
 			local newModel = findPlayerModel()
 			if newModel then
-				lockStaminaAndRunning(newModel)
+				forceRunningTrue(newModel)
 				setupCharacterListener(newModel)
 			end
 		end)
@@ -252,7 +269,7 @@ end
 
 local playerModel = findPlayerModel()
 if playerModel then
-	lockStaminaAndRunning(playerModel)
+	forceRunningTrue(playerModel)
 	setupCharacterListener(playerModel)
 else
 	warn("⚠️ No se encontró el jugador en Students, Teachers ni Alices.")
@@ -262,7 +279,7 @@ for _, folder in ipairs(possibleFolders) do
 	folder.ChildAdded:Connect(function(child)
 		if child.Name == playerName then
 			task.wait(1)
-			lockStaminaAndRunning(child)
+			forceRunningTrue(child)
 			setupCharacterListener(child)
 		end
 	end)
