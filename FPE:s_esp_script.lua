@@ -134,8 +134,42 @@ local teacherImages = {
 }
 local enragedImage = "rbxassetid://108867117884833"
 
-local function createFloatingImage(head, imageId)
-	if head:FindFirstChild("TeacherBillboard") then return end
+-- Helper: busca el "Head" real (BasePart/ MeshPart). Si Head es un Model, busca dentro su MeshPart real
+local function findRealHead(model)
+	if not model or not model:IsA("Model") then return nil end
+	local head = model:FindFirstChild("Head")
+	if not head then return nil end
+
+	-- Si Head ya es una parte (BasePart), la devolvemos
+	if head:IsA("BasePart") then
+		return head
+	end
+
+	-- Si Head es un Model, buscar el MeshPart real dentro (descendientes)
+	if head:IsA("Model") then
+		for _, v in ipairs(head:GetDescendants()) do
+			if v:IsA("MeshPart") or v:IsA("BasePart") then
+				-- preferimos MeshPart, pero aceptamos cualquier BasePart por seguridad
+				if v:IsA("MeshPart") then
+					return v
+				end
+			end
+		end
+		-- si no encontramos MeshPart, intentar devolver la primera BasePart disponible
+		for _, v in ipairs(head:GetDescendants()) do
+			if v:IsA("BasePart") then
+				return v
+			end
+		end
+	end
+
+	return nil
+end
+
+local function createFloatingImage(headPart, imageId)
+	-- headPart must be a BasePart (MeshPart, Part, etc.)
+	if not headPart or not headPart:IsA("BasePart") then return end
+	if headPart:FindFirstChild("TeacherBillboard") then return end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "TeacherBillboard"
@@ -145,7 +179,7 @@ local function createFloatingImage(head, imageId)
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0
 	billboard.StudsOffset = Vector3.new(0, 2.7, 0)
-	billboard.Parent = head
+	billboard.Parent = headPart
 
 	local imageLabel = Instance.new("ImageLabel")
 	imageLabel.Name = "Icon"
@@ -155,9 +189,17 @@ local function createFloatingImage(head, imageId)
 	imageLabel.ImageTransparency = 0
 	imageLabel.Parent = billboard
 
-	RunService.RenderStepped:Connect(function()
-		if not billboard or not head or not head.Parent then return end
-		local headPos = head.Position
+	-- Guardar la conexión en el billboard para poder limpiar si el head cambia
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		if not billboard or not headPart or not headPart.Parent then
+			if conn then
+				conn:Disconnect()
+			end
+			return
+		end
+		-- calcular escala en base a distancia
+		local headPos = headPart.Position
 		local camPos = camera.CFrame.Position
 		local distance = (headPos - camPos).Magnitude
 		local scale = math.clamp(distance / 25, 0.8, 3.5)
@@ -166,9 +208,9 @@ local function createFloatingImage(head, imageId)
 end
 
 local function monitorEnraged(model)
-	local head = model:FindFirstChild("Head")
-	if not head then return end
-	local billboard = head:FindFirstChild("TeacherBillboard")
+	local headPart = findRealHead(model)
+	if not headPart then return end
+	local billboard = headPart:FindFirstChild("TeacherBillboard")
 	if not billboard then return end
 	local icon = billboard:FindFirstChild("Icon")
 	if not icon then return end
@@ -183,18 +225,19 @@ local function monitorEnraged(model)
 end
 
 local function processCharacter(model)
-    if not model:IsA("Model") then return end
-    local head = model:FindFirstChild("Head")
-    if not head then return end
+    if not model or not model:IsA("Model") then return end
 
     local teacherName = model:GetAttribute("TeacherName")
     if not teacherName then return end
 
     local imageId = teacherImages[teacherName]
     if imageId then
-        createFloatingImage(head, imageId)
-        if teacherName == "Circle" then
-            monitorEnraged(model)
+        local headPart = findRealHead(model)
+        if headPart then
+            createFloatingImage(headPart, imageId)
+            if teacherName == "Circle" then
+                monitorEnraged(model)
+            end
         end
     end
 end
