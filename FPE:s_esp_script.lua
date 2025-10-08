@@ -489,6 +489,35 @@ do
 
 	sprintButton.Visible = false
 
+	-- 🔹 Si el jugador reaparece en cualquiera de las 3 carpetas, ocultar Sprint
+local function hideSprintIfInFolders()
+	local foldersToCheck = {
+		game.Workspace:FindFirstChild("Students"),
+		game.Workspace:FindFirstChild("Alices"),
+		game.Workspace:FindFirstChild("Teachers")
+	}
+
+	for _, folder in ipairs(foldersToCheck) do
+		if folder and folder:FindFirstChild(player.Name) then
+			sprintButton.Visible = false
+			return
+		end
+	end
+end
+
+-- Ejecutar cuando el jugador reaparece
+player.CharacterAdded:Connect(function(character)
+	task.wait(0.5)
+	hideSprintIfInFolders()
+end)
+
+-- También verificar cada pocos segundos por seguridad
+task.spawn(function()
+	while task.wait(2) do
+		hideSprintIfInFolders()
+	end
+end)
+
 	local sprintInfButton = sprintButton:Clone()
 	sprintInfButton.Name = "Sprint_Inf"
 	sprintInfButton.Visible = true
