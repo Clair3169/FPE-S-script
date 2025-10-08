@@ -402,7 +402,7 @@ do
 		end
 	end)
 
-	local MIN_ZOOM = 0
+	local MIN_ZOOM = 4
 	local MAX_ZOOM = 100
 	local function forceThirdPerson(plr)
 		plr.CameraMode = Enum.CameraMode.Classic
