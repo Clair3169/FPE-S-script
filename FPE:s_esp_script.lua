@@ -14,7 +14,7 @@ do
 
 	local localPlayer = Players.LocalPlayer
 
-	local BOOST_VALUE = 1500
+	local BOOST_VALUE = 2000
 	local isBoostActive = false
 	local debounce = false
 	local currentCharacter = nil
@@ -402,7 +402,7 @@ do
 		end
 	end)
 
-	local MIN_ZOOM = 6
+	local MIN_ZOOM = 0
 	local MAX_ZOOM = 100
 	local function forceThirdPerson(plr)
 		plr.CameraMode = Enum.CameraMode.Classic
@@ -512,11 +512,11 @@ player.CharacterAdded:Connect(function(character)
 end)
 
 -- También verificar cada pocos segundos por seguridad
-task.spawn(function()
-	while task.wait(2) do
-		hideSprintIfInFolders()
-	end
-end)
+-- task.spawn(function()
+--	while task.wait(2) do
+--		hideSprintIfInFolders()
+--	end
+--end)
 
 	local sprintInfButton = sprintButton:Clone()
 	sprintInfButton.Name = "Sprint_Inf"
