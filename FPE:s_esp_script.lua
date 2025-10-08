@@ -160,6 +160,9 @@ do
 	local UserInputService = game:GetService("UserInputService")
 	local Workspace = game:GetService("Workspace")
 	local Lighting = game:GetService("Lighting")
+	local gameUi = playerGui:WaitForChild("GameUI")
+	local mobileFrame = gameUi:WaitForChild("Mobile")
+	local sprintButton = mobileFrame:WaitForChild("Sprint")
 
 	local player = Players.LocalPlayer
 	local camera = Workspace.CurrentCamera
@@ -482,10 +485,6 @@ do
 		local newState = not current
 		model:SetAttribute("Running", newState)
 	end
-
-	local gameUi = playerGui:WaitForChild("GameUI")
-	local mobileFrame = gameUi:WaitForChild("Mobile")
-	local sprintButton = mobileFrame:WaitForChild("Sprint")
 
 	sprintButton.Visible = false
 
