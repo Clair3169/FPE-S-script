@@ -1,225 +1,264 @@
 -- ===================================================================================
--- UNIÓN (SIN MEZCLAR) — Dos scripts independientes en un mismo LocalScript
---  - Bloque A: Boost de Thavel (tecla F / Alt2)
---  - Bloque B: Hella Mode ReMAKE + Floating Images + ShiftLock + Cámara + Sprint
+-- 🚀 SCRIPT UNIFICADO PARA EL CLIENTE (VERSIÓN SILENCIOSA)
+-- ===================================================================================
+-- Este LocalScript gestiona múltiples funcionalidades del lado del jugador:
 -- 
--- Nota: Cada bloque está aislado con `do ... end` para evitar colisiones de variables.
+--  1. Control de Stamina en la zona "Alices".
+--  2. Boost de habilidad para el personaje "Thavel".
+--  3. Sistemas generales (Hella Mode, ShiftLock, Iconos Flotantes, Cámara, etc.).
+--
+-- Cada funcionalidad principal está encapsulada en un bloque `do ... end` para
+-- asegurar que las variables locales no interfieran entre sí.
 -- ===================================================================================
 
-------------------------------------------------------------------------------------
--- BLOQUE A — BOOST DE THAVEL
-------------------------------------------------------------------------------------
+-- 🔹 SERVICIOS GLOBALES (Definidos una vez para todo el script)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+
+-- 🔹 VARIABLES GLOBALES
+local localPlayer = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+-- ===================================================================================
+-- ⚙️ CONFIGURACIÓN CENTRAL
+-- ===================================================================================
+local CONFIG = {
+    ALICES_STAMINA_VALUE = 2000, -- Stamina otorgada al hacer "grab" dentro de Alices.
+    THAVEL_BOOST_VALUE = 1500,   -- Stamina otorgada por el boost de Thavel.
+    CAMERA_MIN_ZOOM = 6,         -- Zoom mínimo de la cámara.
+    CAMERA_MAX_ZOOM = 100        -- Zoom máximo de la cámara.
+}
+
+-- ===================================================================================
+-- BLOQUE 1: CONTROL DE STAMINA EN ZONA "ALICES"
+-- ===================================================================================
 do
-	-- 🔹 Servicios (locales al bloque)
-	local Players = game:GetService("Players")
-	local UserInputService = game:GetService("UserInputService")
+    -- Variables específicas del bloque
+    local Alices = Workspace:WaitForChild("Alices")
+    local character
+    local insideAlices = false
+    local defaultMaxStamina, defaultCurrentStamina
+    local doingGrabConnection
 
-	local localPlayer = Players.LocalPlayer
+    -- Función para aplicar o restaurar la stamina según el estado
+    local function updateStamina()
+        if not character then return end
+        local doingGrab = character:GetAttribute("DoingGrab")
 
-	-- ⚙️ Configuración
-	local BOOST_VALUE = 1500
-	local isBoostActive = false
-	local debounce = false
-	local currentCharacter = nil
-	local teacherActive = false
+        if insideAlices and doingGrab then
+            character:SetAttribute("MaxStamina", CONFIG.ALICES_STAMINA_VALUE)
+            character:SetAttribute("Stamina", CONFIG.ALICES_STAMINA_VALUE)
+        elseif defaultMaxStamina and defaultCurrentStamina then
+            character:SetAttribute("MaxStamina", defaultMaxStamina)
+            character:SetAttribute("Stamina", defaultCurrentStamina)
+        end
+    end
 
-	-- 🧩 Obtener el TextLabel "Timer" del botón Alt2
-	local function getTimerLabel()
-		local playerGui = localPlayer:FindFirstChild("PlayerGui")
-		if not playerGui then return nil end
+    -- Revisa constantemente si el jugador está dentro de la zona "Alices"
+    local function checkIfInsideAlices()
+        if not character or not Alices then return end
+        local isCurrentlyInAlices = character:IsDescendantOf(Alices)
 
-		local gameUI = playerGui:FindFirstChild("GameUI")
-		if not gameUI then return nil end
+        -- El jugador acaba de entrar
+        if isCurrentlyInAlices and not insideAlices then
+            insideAlices = true
+            -- Guardar valores originales de stamina
+            defaultMaxStamina = character:GetAttribute("MaxStamina")
+            defaultCurrentStamina = character:GetAttribute("Stamina")
 
-		local mobileFrame = gameUI:FindFirstChild("Mobile")
-		if not mobileFrame then return nil end
+            -- Conectar el evento de cambio del atributo "DoingGrab"
+            if doingGrabConnection then doingGrabConnection:Disconnect() end
+            doingGrabConnection = character:GetAttributeChangedSignal("DoingGrab"):Connect(updateStamina)
+            updateStamina() -- Comprobar estado inicial
 
-		local alt2 = mobileFrame:FindFirstChild("Alt2")
-		if not alt2 then return nil end
+        -- El jugador acaba de salir
+        elseif not isCurrentlyInAlices and insideAlices then
+            insideAlices = false
+            -- Desconectar el evento y restaurar valores
+            if doingGrabConnection then
+                doingGrabConnection:Disconnect()
+                doingGrabConnection = nil
+            end
 
-		return alt2:FindFirstChild("Timer")
-	end
+            if defaultMaxStamina and defaultCurrentStamina then
+                character:SetAttribute("MaxStamina", defaultMaxStamina)
+                character:SetAttribute("Stamina", defaultCurrentStamina)
+            end
+        end
+    end
 
-	-- 🧩 Función para restaurar los valores originales
-	local function restoreDefaults(char, originalMax, originalStamina)
-		if char and char.Parent then
-			char:SetAttribute("MaxStamina", originalMax)
-			char:SetAttribute("Stamina", originalStamina)
-		end
-	end
+    -- Función de inicialización para el personaje
+    local function setupCharacter(newCharacter)
+        character = newCharacter
+        insideAlices = false
+        task.wait(0.1)
+        checkIfInsideAlices()
+    end
 
-	-- 🧩 Aplicar Boost manualmente (solo si Timer.Visible == false)
-	local function applyBoost(char)
-		if not char or debounce then return end
-		if not teacherActive then return end
-
-		local timer = getTimerLabel()
-		if timer and timer.Visible then
-			return -- Cooldown activo → no aplicar boost
-		end
-
-		local originalMax = char:GetAttribute("MaxStamina") or 100
-		local originalStamina = char:GetAttribute("Stamina") or 100
-
-		-- Si ya tiene boost, no volver a aplicar
-		if isBoostActive then return end
-
-		isBoostActive = true
-		debounce = true
-
-		-- Guardar valores originales si no existen
-		if not char:GetAttribute("OriginalMax") then
-			char:SetAttribute("OriginalMax", originalMax)
-		end
-		if not char:GetAttribute("OriginalStamina") then
-			char:SetAttribute("OriginalStamina", originalStamina)
-		end
-
-		char:SetAttribute("MaxStamina", BOOST_VALUE)
-		char:SetAttribute("Stamina", BOOST_VALUE)
-
-		debounce = false
-	end
-
-	-- 🧩 Monitorear el Timer: cuando se vuelve visible, quitar boost
-	local function monitorTimer()
-		local timer = getTimerLabel()
-		if not timer then return end
-
-		timer:GetPropertyChangedSignal("Visible"):Connect(function()
-			if timer.Visible and isBoostActive then
-				-- Cuando el Timer se vuelve visible → restaurar valores
-				local char = currentCharacter
-				if char then
-					local originalMax = char:GetAttribute("OriginalMax") or 100
-					local originalStamina = char:GetAttribute("OriginalStamina") or 100
-					restoreDefaults(char, originalMax, originalStamina)
-				end
-				isBoostActive = false
-			end
-		end)
-	end
-
-	-- 🧩 Detectar si el personaje es Thavel
-	local function validateCharacter(char)
-		task.wait(0.5)
-		local teacherName = char:GetAttribute("TeacherName")
-
-		if teacherName == "Thavel" then
-			currentCharacter = char
-			teacherActive = true
-		else
-			teacherActive = false
-		end
-
-		-- Detectar muerte → limpiar referencias
-		local humanoid = char:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.Died:Connect(function()
-				isBoostActive = false
-				debounce = false
-				currentCharacter = nil
-				teacherActive = false
-			end)
-		end
-	end
-
-	-- 🧩 Controles
-	local function setupControls()
-		-- Tecla F
-		UserInputService.InputBegan:Connect(function(input, processed)
-			if processed then return end
-			if input.KeyCode == Enum.KeyCode.F and currentCharacter then
-				applyBoost(currentCharacter)
-			end
-		end)
-
-		-- Botón Alt2 (móvil)
-		task.defer(function()
-			local playerGui = localPlayer:WaitForChild("PlayerGui")
-			local gameUI = playerGui:WaitForChild("GameUI")
-			local mobileFrame = gameUI:WaitForChild("Mobile")
-			local alt2Button = mobileFrame:WaitForChild("Alt2")
-
-			if alt2Button and (alt2Button:IsA("TextButton") or alt2Button:IsA("ImageButton")) then
-				alt2Button.MouseButton1Click:Connect(function()
-					if currentCharacter then
-						applyBoost(currentCharacter)
-					end
-				end)
-			end
-		end)
-	end
-
-	-- 🧩 Inicializar
-	setupControls()
-	monitorTimer()
-
-	-- Detectar personaje inicial
-	if localPlayer.Character then
-		validateCharacter(localPlayer.Character)
-	end
-
-	-- Detectar respawns
-	localPlayer.CharacterAdded:Connect(function(newChar)
-		validateCharacter(newChar)
-		task.wait(1)
-		monitorTimer()
-	end)
+    -- Conexiones de personaje
+    RunService.Heartbeat:Connect(checkIfInsideAlices)
+    localPlayer.CharacterAdded:Connect(setupCharacter)
+    if localPlayer.Character then
+        setupCharacter(localPlayer.Character)
+    end
 end
 
-------------------------------------------------------------------------------------
--- BLOQUE B — Hella Mode ReMAKE + Floating Image Guides + Camera Control + etc.
-------------------------------------------------------------------------------------
+-- ===================================================================================
+-- BLOQUE 2: BOOST DE HABILIDAD "THAVEL" (TECLA F / BOTÓN ALT2)
+-- ===================================================================================
 do
-	-- === SCRIPT UNIFICADO: Hella Mode ReMAKE + Floating Image Guides + Camera Control + Leaderboard Cleanup + ColorCorrection Control + Sprint Infinito ===
+    -- Variables específicas del bloque
+    local isBoostActive = false
+    local debounce = false
+    local currentCharacter = nil
+    local isThavelActive = false
 
-	-- SERVICIOS (locales al bloque)
-	local CoreGui = game:GetService("CoreGui")
-	local Players = game:GetService("Players")
-	local RunService = game:GetService("RunService")
-	local ContextActionService = game:GetService("ContextActionService")
-	local UserInputService = game:GetService("UserInputService")
-	local Workspace = game:GetService("Workspace")
-	local Lighting = game:GetService("Lighting")
+    -- Obtiene la etiqueta "Timer" del botón de la habilidad
+    local function getTimerLabel()
+        local playerGui = localPlayer:FindFirstChild("PlayerGui")
+        local gameUI = playerGui and playerGui:FindFirstChild("GameUI")
+        local mobileFrame = gameUI and gameUI:FindFirstChild("Mobile")
+        local alt2 = mobileFrame and mobileFrame:FindFirstChild("Alt2")
+        return alt2 and alt2:FindFirstChild("Timer")
+    end
 
-	-- VARIABLES COMUNES
-	local player = Players.LocalPlayer
-	local camera = Workspace.CurrentCamera
+    -- Restaura los valores de stamina originales
+    local function restoreDefaults(char)
+        if char and char.Parent then
+            local originalMax = char:GetAttribute("OriginalMax") or 100
+            local originalStamina = char:GetAttribute("OriginalStamina") or 100
+            char:SetAttribute("MaxStamina", originalMax)
+            char:SetAttribute("Stamina", originalStamina)
+        end
+    end
 
-	-- =========================================================================================================
-	--                                          ⚙️ LÓGICA DE SHIFTLOCK
-	-- =========================================================================================================
+    -- Aplica el boost de stamina
+    local function applyBoost(char)
+        if not char or debounce or not isThavelActive or isBoostActive then return end
+        local timer = getTimerLabel()
+        if timer and timer.Visible then return end
 
-	local ShiftLockScreenGui = Instance.new("ScreenGui")
+        isBoostActive = true
+        debounce = true
+
+        if not char:GetAttribute("OriginalMax") then
+            char:SetAttribute("OriginalMax", char:GetAttribute("MaxStamina") or 100)
+        end
+        if not char:GetAttribute("OriginalStamina") then
+            char:SetAttribute("OriginalStamina", char:GetAttribute("Stamina") or 100)
+        end
+
+        char:SetAttribute("MaxStamina", CONFIG.THAVEL_BOOST_VALUE)
+        char:SetAttribute("Stamina", CONFIG.THAVEL_BOOST_VALUE)
+        debounce = false
+    end
+
+    -- Monitorea el temporizador de la UI
+    local function monitorTimer()
+        local timer = getTimerLabel()
+        if not timer then return end
+        timer:GetPropertyChangedSignal("Visible"):Connect(function()
+            if timer.Visible and isBoostActive then
+                if currentCharacter then
+                    restoreDefaults(currentCharacter)
+                end
+                isBoostActive = false
+            end
+        end)
+    end
+
+    -- Valida si el personaje es "Thavel"
+    local function validateCharacter(char)
+        task.wait(0.5)
+        local teacherName = char:GetAttribute("TeacherName")
+        isThavelActive = (teacherName == "Thavel")
+        if isThavelActive then
+            currentCharacter = char
+        else
+            currentCharacter = nil
+        end
+        
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.Died:Connect(function()
+                isBoostActive = false
+                debounce = false
+                currentCharacter = nil
+                isThavelActive = false
+            end)
+        end
+    end
+
+    -- Configura los controles
+    local function setupControls()
+        UserInputService.InputBegan:Connect(function(input, processed)
+            if processed then return end
+            if input.KeyCode == Enum.KeyCode.F and currentCharacter then
+                applyBoost(currentCharacter)
+            end
+        end)
+
+        task.defer(function()
+            local playerGui = localPlayer:WaitForChild("PlayerGui")
+            local gameUI = playerGui:WaitForChild("GameUI")
+            local mobileFrame = gameUI:WaitForChild("Mobile")
+            local alt2Button = mobileFrame:WaitForChild("Alt2")
+            if alt2Button then
+                alt2Button.MouseButton1Click:Connect(function()
+                    if currentCharacter then
+                        applyBoost(currentCharacter)
+                    end
+                end)
+            end
+        end)
+    end
+
+    -- Inicialización
+    setupControls()
+    monitorTimer()
+    localPlayer.CharacterAdded:Connect(function(newChar)
+        validateCharacter(newChar)
+        task.wait(1)
+        monitorTimer()
+    end)
+    if localPlayer.Character then
+        validateCharacter(localPlayer.Character)
+    end
+end
+
+-- ===================================================================================
+-- BLOQUE 3: SISTEMAS GENERALES (HELLA MODE, SHIFTLOCK, ICONOS, CÁMARA, SPRINT)
+-- ===================================================================================
+do
+    -- 3.1: SHIFTLOCK PERSONALIZADO
+    local ShiftLockScreenGui = Instance.new("ScreenGui")
 	local ShiftLockButton = Instance.new("ImageButton")
 	local ShiftlockCursor = Instance.new("ImageLabel")
-
 	local States = {
 		Off = "rbxasset://textures/ui/mouseLock_off@2x.png",
 		On = "rbxasset://textures/ui/mouseLock_on@2x.png",
 		Lock = "rbxasset://textures/MouseLockedCursor.png",
-		Lock2 = "rbxasset://SystemCursors/Cross"
 	}
 	local MaxLength = 900000
 	local EnabledOffset = CFrame.new(1.7, 0, 0)
 	local DisabledOffset = CFrame.new(-1.7, 0, 0)
-	local Active
-
+	local ActiveConnection
 	ShiftLockScreenGui.Name = "Shiftlock (CoreGui)"
 	ShiftLockScreenGui.Parent = CoreGui
 	ShiftLockScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	ShiftLockScreenGui.ResetOnSpawn = false
-
 	ShiftLockButton.Parent = ShiftLockScreenGui
-	ShiftLockButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	ShiftLockButton.BackgroundTransparency = 1
 	ShiftLockButton.AnchorPoint = Vector2.new(1, 1)
 	ShiftLockButton.Position = UDim2.new(1, 0, 1, 0)
 	ShiftLockButton.Size = UDim2.new(0.08, 0, 0.08, 0)
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
-
 	ShiftlockCursor.Name = "Shiftlock Cursor"
 	ShiftlockCursor.Parent = ShiftLockScreenGui
 	ShiftlockCursor.Image = States.Lock
@@ -228,376 +267,148 @@ do
 	ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
 	ShiftlockCursor.SizeConstraint = Enum.SizeConstraint.RelativeXX
 	ShiftlockCursor.BackgroundTransparency = 1
-	ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 	ShiftlockCursor.Visible = false
-
-	-- Ojo Fake
 	local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
 	local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
-
 	if uiStroke then
 		uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
-			if uiStroke.Thickness == 1.5 then
-				frame.Visible = true
-			end
+			if uiStroke.Thickness == 1.5 then frame.Visible = true end
 		end)
 	end
-
 	ShiftLockButton.MouseButton1Click:Connect(function()
-		if not Active then
-			Active = RunService.RenderStepped:Connect(function()
-				if player.Character and player.Character:FindFirstChild("Humanoid") then
-					player.Character.Humanoid.AutoRotate = false
+		if not ActiveConnection then
+			ActiveConnection = RunService.RenderStepped:Connect(function()
+				if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+					localPlayer.Character.Humanoid.AutoRotate = false
 					ShiftLockButton.Image = States.On
 					ShiftlockCursor.Visible = true
-					if frame and uiStroke.Thickness ~= 1.5 then
-						frame.Visible = false
-					end
-					if player.Character:FindFirstChild("HumanoidRootPart") then
-						player.Character.HumanoidRootPart.CFrame = CFrame.new(
-							player.Character.HumanoidRootPart.Position,
-							Vector3.new(
-								camera.CFrame.LookVector.X * MaxLength,
-								player.Character.HumanoidRootPart.Position.Y,
-								camera.CFrame.LookVector.Z * MaxLength
-							)
-						)
+					if frame and uiStroke.Thickness ~= 1.5 then frame.Visible = false end
+					if localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+						local hrp = localPlayer.Character.HumanoidRootPart
+						hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(camera.CFrame.LookVector.X * MaxLength, hrp.Position.Y, camera.CFrame.LookVector.Z * MaxLength))
 					end
 					camera.CFrame = camera.CFrame * EnabledOffset
-					camera.Focus = CFrame.fromMatrix(
-						camera.Focus.Position,
-						camera.CFrame.RightVector,
-						camera.CFrame.UpVector
-					) * EnabledOffset
+					camera.Focus = CFrame.fromMatrix(camera.Focus.Position, camera.CFrame.RightVector, camera.CFrame.UpVector) * EnabledOffset
 				end
 			end)
 		else
-			if player.Character and player.Character:FindFirstChild("Humanoid") then
-				player.Character.Humanoid.AutoRotate = true
+			if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+				localPlayer.Character.Humanoid.AutoRotate = true
 			end
 			ShiftLockButton.Image = States.Off
 			camera.CFrame = camera.CFrame * DisabledOffset
 			ShiftlockCursor.Visible = false
-			if frame and uiStroke.Thickness ~= 1.5 then
-				frame.Visible = true
-			end
-			pcall(function()
-				Active:Disconnect()
-				Active = nil
-			end)
+			if frame and uiStroke.Thickness ~= 1.5 then frame.Visible = true end
+			ActiveConnection:Disconnect()
+			ActiveConnection = nil
 		end
 	end)
-
-	local function ShiftLock() end
-	local ShiftLockAction = ContextActionService:BindAction("Shift Lock", ShiftLock, false, "On")
+	ContextActionService:BindAction("Shift Lock", function() end, false, "On")
 	ContextActionService:SetPosition("Shift Lock", UDim2.new(1, -70, 1, -70))
 
-	-- =========================================================================================================
-	-- 👤 ICONOS FLOTANTES Y CÁMARA
-	-- =========================================================================================================
+    -- 3.2: ICONOS FLOTANTES Y CÁMARA
+    local TeachersFolder = Workspace:WaitForChild("Teachers")
+    local AlicesFolder = Workspace:WaitForChild("Alices")
+    local teacherImages = { Thavel = "rbxassetid://126007170470250", Bloomie = "rbxassetid://116769479448758", Circle = "rbxassetid://72842137403522", Alice = "rbxassetid://94023609108845", AlicePhase2 = "rbxassetid://78066130044573" }
+    local enragedImage = "rbxassetid://108867117884833"
+    local function findRealHead(model)
+        if not model or not model:IsA("Model") then return nil end
+        local head = model:FindFirstChild("Head")
+        if not head then return nil end
+        if head:IsA("BasePart") then return head end
+        if head:IsA("Model") then return head:FindFirstChildOfClass("MeshPart") or head:FindFirstChildOfClass("BasePart") end
+        return nil
+    end
+    local function createFloatingImage(headPart, imageId)
+        if not headPart or not headPart:IsA("BasePart") or headPart:FindFirstChild("TeacherBillboard") then return end
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "TeacherBillboard"
+        local size = (imageId == teacherImages.AlicePhase2) and 6 or 4
+        billboard.Size = UDim2.new(size, 0, size, 0)
+        billboard.AlwaysOnTop = true
+        billboard.LightInfluence = 0
+        billboard.StudsOffset = Vector3.new(0, 2.7, 0)
+        billboard.Parent = headPart
+        local imageLabel = Instance.new("ImageLabel")
+        imageLabel.Name = "Icon"
+        imageLabel.Size = UDim2.new(1, 0, 1, 0)
+        imageLabel.BackgroundTransparency = 1
+        imageLabel.Image = imageId
+        imageLabel.Parent = billboard
+        local conn = RunService.RenderStepped:Connect(function()
+            if not billboard.Parent then conn:Disconnect() return end
+            local distance = (headPart.Position - camera.CFrame.Position).Magnitude
+            local scale = math.clamp(distance / 25, 0.8, 3.5)
+            billboard.Size = UDim2.new(size * scale, 0, size * scale, 0)
+        end)
+    end
+    local function monitorEnraged(model)
+        local headPart = findRealHead(model)
+        if not headPart or not billboard then return end
+        local billboard = headPart:FindFirstChild("TeacherBillboard")
+        if not billboard then return end
+        local icon = billboard:FindFirstChild("Icon")
+        if not icon then return end
+        local function updateImage() icon.Image = (model:GetAttribute("Enraged") == true) and enragedImage or teacherImages["Circle"] end
+        updateImage()
+        model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
+    end
+    local function processCharacter(model)
+        if not model or not model:IsA("Model") then return end
+        local teacherName = model:GetAttribute("TeacherName")
+        if teacherName and teacherImages[teacherName] then
+            local headPart = findRealHead(model)
+            if headPart then
+                createFloatingImage(headPart, teacherImages[teacherName])
+                if teacherName == "Circle" then monitorEnraged(model) end
+            end
+        end
+    end
+    local function isPlayerInSpecialFolder() return TeachersFolder:FindFirstChild(localPlayer.Name) or AlicesFolder:FindFirstChild(localPlayer.Name) end
+    for _, t in ipairs(TeachersFolder:GetChildren()) do if not isPlayerInSpecialFolder() or t.Name ~= localPlayer.Name then processCharacter(t) end end
+    for _, a in ipairs(AlicesFolder:GetChildren()) do if not isPlayerInSpecialFolder() or a.Name ~= localPlayer.Name then processCharacter(a) end end
+    TeachersFolder.ChildAdded:Connect(function(child) task.wait(1) if not isPlayerInSpecialFolder() or child.Name ~= localPlayer.Name then processCharacter(child) end end)
+    AlicesFolder.ChildAdded:Connect(function(child) task.wait(1) if not isPlayerInSpecialFolder() or child.Name ~= localPlayer.Name then processCharacter(child) end end)
+    local function forceThirdPerson(plr) plr.CameraMode = Enum.CameraMode.Classic; plr.CameraMinZoomDistance = CONFIG.CAMERA_MIN_ZOOM; plr.CameraMaxZoomDistance = CONFIG.CAMERA_MAX_ZOOM; end
+    task.spawn(function() while task.wait(1) do for _, plr in ipairs(Players:GetPlayers()) do if plr.CameraMode == Enum.CameraMode.LockFirstPerson then forceThirdPerson(plr) end end end end)
+    Players.PlayerAdded:Connect(function(plr) forceThirdPerson(plr) plr.CharacterAdded:Connect(function() task.wait(0.5) forceThirdPerson(plr) end) end)
+    for _, plr in ipairs(Players:GetPlayers()) do forceThirdPerson(plr) plr.CharacterAdded:Connect(function() task.wait(0.5) forceThirdPerson(plr) end) end
 
-	local TeachersFolder = Workspace:WaitForChild("Teachers")
-	local AlicesFolder = Workspace:WaitForChild("Alices")
+    -- 3.3: LIMPIEZA DE ENTORNO Y AJUSTES VISUALES
+    local leaderboard = Workspace:WaitForChild("Area"):WaitForChild("Map"):WaitForChild("Leaderboard")
+    for _, child in ipairs(leaderboard:GetChildren()) do child:Destroy() end
+    leaderboard.ChildAdded:Connect(function(child) child:Destroy() end)
+    local blackout = Lighting:FindFirstChild("BlackoutColorCorrection")
+    local darkness = Lighting:FindFirstChild("DarknessColorCorrection")
+    RunService.RenderStepped:Connect(function()
+        if blackout and blackout.Enabled then blackout.Enabled = false end
+        if darkness and darkness.Enabled then darkness.Enabled = false end
+    end)
 
-	local teacherImages = {
-		Thavel = "rbxassetid://126007170470250",
-		Bloomie = "rbxassetid://116769479448758",
-		Circle = "rbxassetid://72842137403522",
-		Alice = "rbxassetid://94023609108845",
-		AlicePhase2 = "rbxassetid://78066130044573"
-	}
-	local enragedImage = "rbxassetid://108867117884833"
-
-	-- Helper: busca el "Head" real (BasePart/ MeshPart). Si Head es un Model, busca dentro su MeshPart real
-	local function findRealHead(model)
-		if not model or not model:IsA("Model") then return nil end
-		local head = model:FindFirstChild("Head")
-		if not head then return nil end
-
-		-- Si Head ya es una parte (BasePart), la devolvemos
-		if head:IsA("BasePart") then
-			return head
-		end
-
-		-- Si Head es un Model, buscar el MeshPart real dentro (descendientes)
-		if head:IsA("Model") then
-			for _, v in ipairs(head:GetDescendants()) do
-				if v:IsA("MeshPart") or v:IsA("BasePart") then
-					-- preferimos MeshPart, pero aceptamos cualquier BasePart por seguridad
-					if v:IsA("MeshPart") then
-						return v
-					end
-				end
-			end
-			-- si no encontramos MeshPart, intentar devolver la primera BasePart disponible
-			for _, v in ipairs(head:GetDescendants()) do
-				if v:IsA("BasePart") then
-					return v
-				end
-			end
-		end
-
-		return nil
-	end
-
-	local function createFloatingImage(headPart, imageId)
-		-- headPart must be a BasePart (MeshPart, Part, etc.)
-		if not headPart or not headPart:IsA("BasePart") then return end
-		if headPart:FindFirstChild("TeacherBillboard") then return end
-
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "TeacherBillboard"
-
-		local size = (imageId == teacherImages.AlicePhase2) and 6 or 4
-		billboard.Size = UDim2.new(size, 0, size, 0)
-		billboard.AlwaysOnTop = true
-		billboard.LightInfluence = 0
-		billboard.StudsOffset = Vector3.new(0, 2.7, 0)
-		billboard.Parent = headPart
-
-		local imageLabel = Instance.new("ImageLabel")
-		imageLabel.Name = "Icon"
-		imageLabel.Size = UDim2.new(1, 0, 1, 0)
-		imageLabel.BackgroundTransparency = 1
-		imageLabel.Image = imageId
-		imageLabel.ImageTransparency = 0
-		imageLabel.Parent = billboard
-
-		-- Guardar la conexión en el billboard para poder limpiar si el head cambia
-		local conn
-		conn = RunService.RenderStepped:Connect(function()
-			if not billboard or not headPart or not headPart.Parent then
-				if conn then
-					conn:Disconnect()
-				end
-				return
-			end
-			-- calcular escala en base a distancia
-			local headPos = headPart.Position
-			local camPos = camera.CFrame.Position
-			local distance = (headPos - camPos).Magnitude
-			local scale = math.clamp(distance / 25, 0.8, 3.5)
-			billboard.Size = UDim2.new(size * scale, 0, size * scale, 0)
-		end)
-	end
-
-	local function monitorEnraged(model)
-		local headPart = findRealHead(model)
-		if not headPart then return end
-		local billboard = headPart:FindFirstChild("TeacherBillboard")
-		if not billboard then return end
-		local icon = billboard:FindFirstChild("Icon")
-		if not icon then return end
-
-		local function updateImage()
-			local enraged = model:GetAttribute("Enraged")
-			icon.Image = (enraged == true) and enragedImage or teacherImages["Circle"]
-		end
-
-		updateImage()
-		model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
-	end
-
-	local function processCharacter(model)
-		if not model or not model:IsA("Model") then return end
-
-		local teacherName = model:GetAttribute("TeacherName")
-		if not teacherName then return end
-
-		local imageId = teacherImages[teacherName]
-		if imageId then
-			local headPart = findRealHead(model)
-			if headPart then
-				createFloatingImage(headPart, imageId)
-				if teacherName == "Circle" then
-					monitorEnraged(model)
-				end
-			end
-		end
-	end
-
-	local function isLocalInFolders()
-		return TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name)
-	end
-
-	for _, t in ipairs(TeachersFolder:GetChildren()) do
-		if not isLocalInFolders() or t.Name ~= player.Name then
-			processCharacter(t)
-		end
-	end
-	for _, a in ipairs(AlicesFolder:GetChildren()) do
-		if not isLocalInFolders() or a.Name ~= player.Name then
-			processCharacter(a)
-		end
-	end
-
-	TeachersFolder.ChildAdded:Connect(function(child)
-		task.wait(1)
-		if not isLocalInFolders() or child.Name ~= player.Name then
-			processCharacter(child)
-		end
-	end)
-	AlicesFolder.ChildAdded:Connect(function(child)
-		task.wait(1)
-		if not isLocalInFolders() or child.Name ~= player.Name then
-			processCharacter(child)
-		end
-	end)
-
-	-- === CONTROL DE CÁMARA ===
-	local MIN_ZOOM = 6
-	local MAX_ZOOM = 100
-	local function forceThirdPerson(plr)
-		plr.CameraMode = Enum.CameraMode.Classic
-		plr.CameraMinZoomDistance = MIN_ZOOM
-		plr.CameraMaxZoomDistance = MAX_ZOOM
-	end
-
-	task.spawn(function()
-		while task.wait(1) do
-			for _, plr in ipairs(Players:GetPlayers()) do
-				if plr.CameraMode == Enum.CameraMode.LockFirstPerson then
-					forceThirdPerson(plr)
-				end
-			end
-		end
-	end)
-
-	Players.PlayerAdded:Connect(function(plr)
-		forceThirdPerson(plr)
-		plr.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			forceThirdPerson(plr)
-		end)
-	end)
-	for _, plr in ipairs(Players:GetPlayers()) do
-		forceThirdPerson(plr)
-		plr.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			forceThirdPerson(plr)
-		end)
-	end
-
-	-- =========================================================================================================
-	-- 🧹 LIMPIEZA Y AJUSTES
-	-- =========================================================================================================
-
-	local area = Workspace:WaitForChild("Area")
-	local map = area:WaitForChild("Map")
-	local leaderboard = map:WaitForChild("Leaderboard")
-
-	for _, child in ipairs(leaderboard:GetChildren()) do
-		child:Destroy()
-	end
-	leaderboard.ChildAdded:Connect(function(child)
-		child:Destroy()
-	end)
-
-	local blackout = Lighting:FindFirstChild("BlackoutColorCorrection")
-	local darkness = Lighting:FindFirstChild("DarknessColorCorrection")
-
-	RunService.RenderStepped:Connect(function()
-		if blackout and blackout.Enabled then blackout.Enabled = false end
-		if darkness and darkness.Enabled then darkness.Enabled = false end
-	end)
-
-	-- =========================================================================================================
-	-- 🏃 SPRINT INFINITO (MÓVIL + PC)
-	-- =========================================================================================================
-
-	local player = game.Players.LocalPlayer
-	local playerGui = player:WaitForChild("PlayerGui")
-
-	local folders = {
-		game.Workspace:WaitForChild("Students", 5),
-		game.Workspace:FindFirstChild("Alices"),
-		game.Workspace:FindFirstChild("Teachers")
-	}
-
-	local function findPlayerModel()
-		for _, folder in ipairs(folders) do
-			if folder then
-				local model = folder:FindFirstChild(player.Name)
-				if model then
-					return model
-				end
-			end
-		end
-		return nil
-	end
-
-	local function toggleRunning()
-		local model = findPlayerModel()
-		if not model then
-			warn("⚠️ No se encontró el modelo del jugador.")
-			return
-		end
-
-		local current = model:GetAttribute("Running")
-		if current == nil then
-			warn("⚠️ El modelo no tiene el atributo 'Running'.")
-			return
-		end
-
-		local newState = not current
-		model:SetAttribute("Running", newState)
-		print("🏃 Sprint infinito:", newState and "ACTIVADO ✅" or "DESACTIVADO ❌")
-	end
-
-	local gameUi = playerGui:WaitForChild("GameUI")
-	local mobileFrame = gameUi:WaitForChild("Mobile")
-	local sprintButton = mobileFrame:WaitForChild("Sprint")
-
-	sprintButton.Visible = false
-
-	local sprintInfButton = sprintButton:Clone()
-	sprintInfButton.Name = "Sprint_Inf"
-	sprintInfButton.Visible = true
-	sprintInfButton.Parent = mobileFrame
-
-	sprintInfButton.MouseButton1Click:Connect(function()
-		toggleRunning()
-	end)
-
-	local UserInputService = game:GetService("UserInputService")
-
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift
-		or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
-			toggleRunning()
-		end
-	end)
-
-	player.CharacterAdded:Connect(function(character)
-		local humanoid = character:WaitForChild("Humanoid")
-
-		humanoid.Died:Connect(function()
-			if sprintButton then
-				sprintButton.Visible = false
-			end
-			task.wait(1)
-			local model = findPlayerModel()
-			if model then
-				model:SetAttribute("Running", true)
-			end
-		end)
-
-		task.wait(1)
-		if sprintButton then
-			sprintButton.Visible = false
-		end
-
-		local model = findPlayerModel()
-		if model then
-			model:SetAttribute("Running", true)
-		end
-	end)
-
-	-- OBS: Se eliminó un "return {} and ShiftLockAction" final que habría terminado la ejecución del chunk.
-	--      La eliminación evita que el script "corte" la ejecución — no cambia la lógica del resto.
+    -- 3.4: SPRINT INFINITO (MÓVIL + PC)
+    local playerGui = localPlayer:WaitForChild("PlayerGui")
+    local potentialFolders = { Workspace:WaitForChild("Students"), Workspace:FindFirstChild("Alices"), Workspace:FindFirstChild("Teachers") }
+    local function findPlayerModel() for _, folder in ipairs(potentialFolders) do if folder then local model = folder:FindFirstChild(localPlayer.Name) if model then return model end end end return nil end
+    local function toggleRunning() local model = findPlayerModel() if not model then return end local current = model:GetAttribute("Running") if current ~= nil then model:SetAttribute("Running", not current) end end
+    local sprintButton = playerGui:WaitForChild("GameUI"):WaitForChild("Mobile"):WaitForChild("Sprint")
+    sprintButton.Visible = false
+    local sprintInfButton = sprintButton:Clone()
+    sprintInfButton.Name = "Sprint_Inf"
+    sprintInfButton.Visible = true
+    sprintInfButton.Parent = sprintButton.Parent
+    sprintInfButton.MouseButton1Click:Connect(toggleRunning)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed) if gameProcessed then return end if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then toggleRunning() end end)
+    localPlayer.CharacterAdded:Connect(function(character)
+        task.wait(1)
+        sprintButton.Visible = false
+        local model = findPlayerModel()
+        if model then model:SetAttribute("Running", true) end
+        local humanoid = character:WaitForChild("Humanoid")
+        humanoid.Died:Connect(function()
+            sprintButton.Visible = false
+            task.wait(1)
+            local modelOnRespawn = findPlayerModel()
+            if modelOnRespawn then modelOnRespawn:SetAttribute("Running", true) end
+        end)
+    end)
 end
-
--- ===================================================================================
--- FIN del archivo — ambos scripts listos y aislados.
--- ===================================================================================
