@@ -3,3 +3,5 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ZamuzFpe/FPE-S-script
 
 -- #2 test
 loadstring(game:HttpGet("https://raw.githubusercontent.com/ZamuzFpe/FPE-S-script/refs/heads/main/Test.lua", true))()
+
+-- loadstring(game:HttpGet("URL_AQUI", true))()
