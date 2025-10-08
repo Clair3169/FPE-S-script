@@ -1,4 +1,4 @@
--- 📜 Script: Etiquetas "Script in beta" y "Ctrl = InfStamina" (configurado por usuario)
+-- 📜 Script: Etiquetas "Script in beta" y "Ctrl = InfStamina" (versión final)
 
 -- Crear la interfaz principal (ScreenGui)
 local screenGui = Instance.new("ScreenGui")
@@ -13,10 +13,11 @@ local function createLabel(text, color, position)
 	label.Size = UDim2.new(0, 200, 0, 22)
 	label.Position = position
 	label.AnchorPoint = Vector2.new(0, 1)
-	label.BackgroundTransparency = 0.5 -- 🔹 Semitransparente
+	label.BackgroundTransparency = 1 -- 🔹 Fondo totalmente invisible
 	label.BorderSizePixel = 0
 	label.Text = text
 	label.TextColor3 = color
+	label.TextTransparency = 0.5 -- 🔹 Texto semitransparente
 	label.TextScaled = true
 	label.Font = Enum.Font.SourceSansBold
 	label.TextStrokeTransparency = 1 -- 🔹 Sin contorno
