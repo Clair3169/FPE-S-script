@@ -576,130 +576,72 @@ do
 	end)
 end
 
-------------------------------------------------------------------------------------
--- 🅳 BLOQUE D — ICONOS SOBRE STUDENTS (solo si eres Teacher o Alice)
-------------------------------------------------------------------------------------
-do
-	local Players = game:GetService("Players")
-	local Workspace = game:GetService("Workspace")
-	local RunService = game:GetService("RunService")
+-- ======================================================
+-- 🟣 BLOQUE D: Icono sobre “Students” (solo visible para “Teachers” y “Alices”)
+-- ======================================================
 
-	local localPlayer = Players.LocalPlayer
-	local localName = localPlayer.Name
+-- Servicios
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
-	-- 📂 Carpetas
-	local StudentsFolder = Workspace:WaitForChild("Students")
-	local TeachersFolder = Workspace:WaitForChild("Teachers")
-	local AlicesFolder = Workspace:WaitForChild("Alices")
+local localPlayer = Players.LocalPlayer
+local allowedFolders = {"Teachers", "Alices"} -- Solo estos ven los iconos
+local ICON_SIZE = 1.2 -- Tamaño base del icono
 
-	-- 📸 Configuración del icono
-	local IMAGE_ID = "rbxassetid://80369039755785"
-	local ICON_SIZE = 4
-	local HEIGHT_OFFSET = 2.5
-
-	-- ✅ Comprueba si el jugador local está en las carpetas permitidas
-	local function isLocalInAllowedFolders()
-		return TeachersFolder:FindFirstChild(localName) or AlicesFolder:FindFirstChild(localName)
-	end
-
-	-- 🔎 Encuentra la cabeza real del modelo
-	local function getHead(model)
-		if not model or not model:IsA("Model") then return nil end
-		local head = model:FindFirstChild("Head")
-		if head and head:IsA("BasePart") then
-			return head
-		end
-		for _, part in ipairs(model:GetDescendants()) do
-			if part:IsA("BasePart") and part.Name:lower():find("head") then
-				return part
-			end
-		end
-		return nil
-	end
-
-	-- 🖼️ Crea el BillboardGui sobre la cabeza
-	local function createBillboard(head)
-		if not head or not head:IsA("BasePart") then return end
-		if head:FindFirstChild("StudentIcon") then return end
-
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "StudentIcon"
-		billboard.AlwaysOnTop = true
-		billboard.Size = UDim2.new(ICON_SIZE, 0, ICON_SIZE, 0)
-		billboard.StudsOffset = Vector3.new(0, HEIGHT_OFFSET, 0)
-		billboard.LightInfluence = 0
-		billboard.Parent = head
-
-		local image = Instance.new("ImageLabel")
-		image.BackgroundTransparency = 1
-		image.Image = IMAGE_ID
-		image.Size = UDim2.new(1, 0, 1, 0)
-		image.Parent = billboard
-
-		-- 🔁 Escalado dinámico según distancia
-		local conn
-		conn = RunService.RenderStepped:Connect(function()
-			if not head or not head.Parent then
-				if conn then conn:Disconnect() end
-				return
-			end
-			local cam = Workspace.CurrentCamera
-			if not cam then return end
-			local dist = (head.Position - cam.CFrame.Position).Magnitude
-			local scale = math.clamp(dist / 30, 0.8, 3.5)
-			billboard.Size = UDim2.new(ICON_SIZE * scale, 0, ICON_SIZE * scale, 0)
-		end)
-	end
-
-	-- ❌ Elimina Billboard existente
-	local function removeBillboard(model)
-		if not model or not model:IsA("Model") then return end
-		local head = getHead(model)
-		if head then
-			local gui = head:FindFirstChild("StudentIcon")
-			if gui then gui:Destroy() end
+-- Verifica si el jugador local pertenece a las carpetas permitidas
+local function isAllowed()
+	for _, folderName in ipairs(allowedFolders) do
+		local folder = Workspace:FindFirstChild(folderName)
+		if folder and folder:FindFirstChild(localPlayer.Name) then
+			return true
 		end
 	end
+	return false
+end
 
-	-- 🧍 Procesa un modelo de estudiante
-	local function processStudent(model)
-		if not model:IsA("Model") then return end
-		if model.Name == localName then return end
-		local head = getHead(model)
-		if head then
-			createBillboard(head)
-		end
-	end
+-- Crea el icono flotante encima de un jugador objetivo
+local function createFloatingIcon(targetChar)
+	if not targetChar then return end
+	local head = targetChar:FindFirstChild("Head")
+	if not head then return end
 
-	-- 👀 Control principal
-	local function updateIcons()
-		if isLocalInAllowedFolders() then
-			for _, student in ipairs(StudentsFolder:GetChildren()) do
-				processStudent(student)
-			end
-		else
-			for _, student in ipairs(StudentsFolder:GetChildren()) do
-				removeBillboard(student)
-			end
-		end
-	end
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "StudentIcon"
+	billboard.AlwaysOnTop = true
+	billboard.Size = UDim2.new(ICON_SIZE, 0, ICON_SIZE, 0)
+	billboard.Adornee = head
+	billboard.Parent = head
+	billboard.StudsOffset = Vector3.new(0, head.Size.Y + 1.5, 0) -- 🔹 Posición arriba de la cabeza
 
-	-- 🧩 Eventos para mantener actualizado
-	StudentsFolder.ChildAdded:Connect(function(child)
-		task.wait(0.5)
-		if isLocalInAllowedFolders() then
-			processStudent(child)
+	local image = Instance.new("ImageLabel")
+	image.BackgroundTransparency = 1
+	image.Image = "rbxassetid://13723895803" -- Cambia el ID del icono aquí
+	image.Size = UDim2.new(1, 0, 1, 0)
+	image.Parent = billboard
+
+	-- 🔁 Escalado dinámico según distancia
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		if not head or not head.Parent then
+			if conn then conn:Disconnect() end
+			return
 		end
+		local cam = Workspace.CurrentCamera
+		if not cam then return end
+		local dist = (head.Position - cam.CFrame.Position).Magnitude
+		local scale = math.clamp(dist / 30, 0.8, 3.5)
+		billboard.Size = UDim2.new(ICON_SIZE * scale, 0, ICON_SIZE * scale, 0)
 	end)
+end
 
-	StudentsFolder.ChildRemoved:Connect(function(child)
-		removeBillboard(child)
-	end)
-
-	-- 🔄 Revisión constante
-	task.spawn(function()
-		while task.wait(2) do
-			updateIcons()
+-- Aplica los iconos solo si el jugador local pertenece a las carpetas permitidas
+if isAllowed() then
+	local studentsFolder = Workspace:FindFirstChild("Students")
+	if studentsFolder then
+		for _, char in ipairs(studentsFolder:GetChildren()) do
+			createFloatingIcon(char)
 		end
-	end)
+		studentsFolder.ChildAdded:Connect(createFloatingIcon)
+	end
 end
