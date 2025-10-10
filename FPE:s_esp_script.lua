@@ -588,7 +588,7 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local allowedFolders = {"Teachers", "Alices"} -- Solo estos ven los iconos
 local ICON_SIZE = 1.2 -- Tamaño base del icono
-local ICON_IMAGE = "rbxassetid://13723895803" -- 🔹 Cambia aquí el ID del icono
+local ICON_IMAGE = "rbxassetid://80369039755785" -- 🔹 Cambia aquí el ID del icono
 
 -- Comprueba si el jugador local pertenece a las carpetas permitidas
 local function isAllowed()
