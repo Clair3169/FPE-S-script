@@ -18,10 +18,10 @@ local heartbeatConnection = nil
 -- ==============================
 
 local speedSettings = {
-	["Alice"] = 31,
-	["Thavel"] = 28,
-	["Circle"] = 27,
-	["Bloomie"] = 28
+	["Alice"] = 32,
+	["Thavel"] = 29,
+	["Circle"] = 29,
+	["Bloomie"] = 29
 }
 
 -- ==============================
@@ -135,7 +135,7 @@ local function checkAndEnforceSpeed()
 			end
 		end
 	elseif isInStudents then
-		character:SetAttribute("RunSpeed", 31)
+		character:SetAttribute("RunSpeed", 30)
 	else
 		character:SetAttribute("RunSpeed", 28)
 	end
