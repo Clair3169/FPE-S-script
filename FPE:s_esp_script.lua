@@ -593,7 +593,7 @@ do
 	local AlicesFolder = Workspace:WaitForChild("Alices")
 
 	-- 📸 Configuración del icono
-	local IMAGE_ID = "rbxassetid://108684383761582"
+	local IMAGE_ID = "rbxassetid://80369039755785"
 	local ICON_SIZE = 4
 	local HEIGHT_OFFSET = 2.5
 
