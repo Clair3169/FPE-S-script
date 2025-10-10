@@ -577,7 +577,7 @@ do
 end
 
 -- ======================================================
--- 🟣 BLOQUE D: Icono sobre “Students” (solo visible para “Teachers” y “Alices”)
+-- 🟣 BLOQUE D: Icono flotante sobre todos los “Students” (jugadores o NPCs)
 -- ======================================================
 
 -- Servicios
@@ -588,8 +588,9 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local allowedFolders = {"Teachers", "Alices"} -- Solo estos ven los iconos
 local ICON_SIZE = 1.2 -- Tamaño base del icono
+local ICON_IMAGE = "rbxassetid://13723895803" -- 🔹 Cambia aquí el ID del icono
 
--- Verifica si el jugador local pertenece a las carpetas permitidas
+-- Comprueba si el jugador local pertenece a las carpetas permitidas
 local function isAllowed()
 	for _, folderName in ipairs(allowedFolders) do
 		local folder = Workspace:FindFirstChild(folderName)
@@ -600,48 +601,63 @@ local function isAllowed()
 	return false
 end
 
--- Crea el icono flotante encima de un jugador objetivo
-local function createFloatingIcon(targetChar)
-	if not targetChar then return end
-	local head = targetChar:FindFirstChild("Head")
+-- Crea el icono flotante sobre un modelo (jugador o NPC)
+local function createFloatingIcon(model)
+	if not model or not model:IsA("Model") then return end
+	if model.Name == localPlayer.Name then return end -- No mostrar sobre sí mismo
+
+	-- Evita duplicados
+	if model:FindFirstChild("StudentIcon") then return end
+
+	local head = model:FindFirstChild("Head")
 	if not head then return end
 
+	-- 🟣 Crear BillboardGui
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "StudentIcon"
 	billboard.AlwaysOnTop = true
 	billboard.Size = UDim2.new(ICON_SIZE, 0, ICON_SIZE, 0)
 	billboard.Adornee = head
 	billboard.Parent = head
-	billboard.StudsOffset = Vector3.new(0, head.Size.Y + 1.5, 0) -- 🔹 Posición arriba de la cabeza
+	billboard.StudsOffset = Vector3.new(0, head.Size.Y + 1.5, 0) -- Posición sobre la cabeza
 
 	local image = Instance.new("ImageLabel")
+	image.Name = "IconImage"
 	image.BackgroundTransparency = 1
-	image.Image = "rbxassetid://80369039755785" -- Cambia el ID del icono aquí
+	image.Image = ICON_IMAGE
 	image.Size = UDim2.new(1, 0, 1, 0)
 	image.Parent = billboard
 
 	-- 🔁 Escalado dinámico según distancia
 	local conn
 	conn = RunService.RenderStepped:Connect(function()
-		if not head or not head.Parent then
+		if not head or not head.Parent or not billboard.Parent then
 			if conn then conn:Disconnect() end
 			return
 		end
+
 		local cam = Workspace.CurrentCamera
 		if not cam then return end
+
 		local dist = (head.Position - cam.CFrame.Position).Magnitude
 		local scale = math.clamp(dist / 30, 0.8, 3.5)
 		billboard.Size = UDim2.new(ICON_SIZE * scale, 0, ICON_SIZE * scale, 0)
 	end)
 end
 
--- Aplica los iconos solo si el jugador local pertenece a las carpetas permitidas
+-- Ejecutar solo si el jugador local pertenece a las carpetas permitidas
 if isAllowed() then
 	local studentsFolder = Workspace:FindFirstChild("Students")
 	if studentsFolder then
-		for _, char in ipairs(studentsFolder:GetChildren()) do
-			createFloatingIcon(char)
+		-- Crear iconos para todo lo existente
+		for _, obj in ipairs(studentsFolder:GetChildren()) do
+			createFloatingIcon(obj)
 		end
-		studentsFolder.ChildAdded:Connect(createFloatingIcon)
+
+		-- Crear iconos automáticamente para nuevos modelos
+		studentsFolder.ChildAdded:Connect(function(obj)
+			task.wait(0.2) -- Pequeña espera por si tarda en cargar la cabeza
+			createFloatingIcon(obj)
+		end)
 	end
 end
