@@ -18,10 +18,10 @@ local heartbeatConnection = nil
 -- ==============================
 
 local speedSettings = {
-	["Alice"] = 32,
-	["Thavel"] = 29,
-	["Circle"] = 29,
-	["Bloomie"] = 29
+	["Alice"] = 31,
+	["Thavel"] = 28,
+	["Circle"] = 28,
+	["Bloomie"] = 28
 }
 
 -- ==============================
