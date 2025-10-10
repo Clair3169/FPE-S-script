@@ -7,4 +7,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- JumpPower Perma #3
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/JumpPower_Perma.lua", true))()
 
+-- Anti_Stunned #4
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Stunned.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
