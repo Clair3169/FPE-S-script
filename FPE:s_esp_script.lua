@@ -616,7 +616,7 @@ local function createFloatingIcon(targetChar)
 
 	local image = Instance.new("ImageLabel")
 	image.BackgroundTransparency = 1
-	image.Image = "rbxassetid://13723895803" -- Cambia el ID del icono aquí
+	image.Image = "rbxassetid://80369039755785" -- Cambia el ID del icono aquí
 	image.Size = UDim2.new(1, 0, 1, 0)
 	image.Parent = billboard
 
