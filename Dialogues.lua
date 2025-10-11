@@ -33,18 +33,18 @@ local validFolders = {
 -- Diálogos
 local dialogues = {
 	Alices = {
-		"✨ Bienvenida al rincón de Alice.",
-		"🌸 Quédate un rato, aquí todo es tranquilo.",
-		"🌿 Siente la calma del jardín de Alice.",
-		"🕊️ Los secretos se guardan bien aquí.",
-		"🎀 La magia de Alice te observa..."
+		"I'm hungry..",
+		"Mission: KILL EVERYONE",
+		"This will be so much fun.. HAHAHA",
+		"Who will want to play with me?.",
+		"My dinner is served"
 	},
 	Teachers = {
-		"📚 El conocimiento es poder.",
-		"🧠 Un maestro enseña incluso con el silencio.",
-		"✏️ Cada error es una nueva lección.",
-		"📖 Los grandes enseñan compartiendo.",
-		"🗝️ La sabiduría está en escuchar."
+		"They all got F-...",
+		"I will kill them all...",
+		"I hate extra work shifts.",
+		"All students are stupid.",
+		"This is ridiculous, work at night argh!"
 	}
 }
 
