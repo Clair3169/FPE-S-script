@@ -10,4 +10,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Anti_Stunned #4
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Stunned.lua", true))()
 
+-- Students ESP #5
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Stundents_Esp.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
