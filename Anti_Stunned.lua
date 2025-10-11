@@ -21,7 +21,7 @@ local speedSettings = {
 	["Alice"] = 31,
 	["Thavel"] = 28,
 	["Circle"] = 28,
-	["Bloomie"] = 28
+	["Bloomie"] = 27
 }
 
 -- ==============================
