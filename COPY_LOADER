@@ -13,4 +13,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Students ESP #5
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Stundents_Esp.lua", true))()
 
+-- Dialogue_Random #6
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Dialogues.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
