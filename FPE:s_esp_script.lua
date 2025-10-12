@@ -225,41 +225,44 @@ local function getFakeCursorUIScale()
 	return frame:FindFirstChildOfClass("UIScale")
 end
 
--- 🔧 Ajustes de desplazamiento (en píxeles)
+-- 🔧 Mantiene el cursor centrado sin importar resolución
+-- 🔧 ShiftLockCursor centrado en todas las resoluciones, con offset fijo (80px)
 local verticalOffset = -56
-local horizontalOffset = 80
+local horizontalOffset = 6
 
--- 🔁 Seguimiento de posición y transparencia
 RunService.RenderStepped:Connect(function()
 	if not ShiftlockCursor.Visible then return end
 
 	local attachment = getFakeCursorAttachment()
 	local uiScale = getFakeCursorUIScale()
+	local viewport = camera.ViewportSize
+	local centerX = viewport.X / 2
+	local centerY = viewport.Y / 2
 
 	if attachment and camera then
 		local worldPos = attachment.WorldPosition
 		local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
+
 		if onScreen then
-			-- 🔸 Actualiza posición
+			-- 🔸 Mantiene el cursor centrado visualmente, con offset fijo de 80px
 			ShiftlockCursor.Position = UDim2.fromOffset(
-				screenPos.X + horizontalOffset,
-				screenPos.Y + verticalOffset
+				centerX + horizontalOffset,
+				centerY + verticalOffset
 			)
 			ShiftlockCursor.Visible = true
 		else
 			ShiftlockCursor.Visible = false
 		end
 	else
-		ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.5, 0)
+		-- 🔸 Si no hay attachment, centra el cursor igual con el offset
+		ShiftlockCursor.Position = UDim2.fromOffset(centerX + horizontalOffset, centerY + verticalOffset)
 	end
 
-	-- 🔸 Manejo de transparencia según UIScale
+	-- 🔸 Manejo de visibilidad según UIScale (como antes)
 	if uiScale then
 		if math.abs(uiScale.Scale - 1.4) < 0.05 then
-			-- UIScale ≈ 1.4 → ocultar Shiftlock
 			ShiftlockCursor.Visible = false
 		else
-			-- UIScale ≈ 1 → mostrar Shiftlock
 			ShiftlockCursor.Visible = true
 		end
 	end
