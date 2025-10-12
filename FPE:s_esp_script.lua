@@ -193,24 +193,75 @@ do
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
 
-	-- === 🎯 ShiftlockCursor (posición fija en GUI) ===
+-- === 🎯 ShiftlockCursor — sigue el FakeCursor + offset + transparencia por UIScale ===
 
 ShiftlockCursor.Name = "ShiftlockCursor"
 ShiftlockCursor.Parent = ShiftLockScreenGui
 ShiftlockCursor.Image = States.Lock
 ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
 ShiftlockCursor.BackgroundTransparency = 1
-ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 ShiftlockCursor.Visible = false
 ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
-	
--- 🔹 Posición fija sin importar resolución o cambios de pantalla
-ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.400000006, 7)
 
--- 🧷 Reforzar posición cada frame para evitar desplazamientos
+local function getFakeCursorAttachment()
+	local debris = Workspace:FindFirstChild("Debris")
+	if not debris then return nil end
+	local fake = debris:FindFirstChild("FakeCursor")
+	if not fake then return nil end
+	return fake:FindFirstChild("Attachment")
+end
+
+local function getFakeCursorUIScale()
+	local debris = Workspace:FindFirstChild("Debris")
+	if not debris then return nil end
+	local fake = debris:FindFirstChild("FakeCursor")
+	if not fake then return nil end
+	local attach = fake:FindFirstChild("Attachment")
+	if not attach then return nil end
+	local gui = attach:FindFirstChild("BillboardGui")
+	if not gui then return nil end
+	local frame = gui:FindFirstChild("Frame")
+	if not frame then return nil end
+	return frame:FindFirstChildOfClass("UIScale")
+end
+
+-- 🔧 Ajustes de desplazamiento (en píxeles)
+local verticalOffset = -56
+local horizontalOffset = 80
+
+-- 🔁 Seguimiento de posición y transparencia
 RunService.RenderStepped:Connect(function()
-	if ShiftlockCursor then
-		ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.400000006, 7)
+	if not ShiftlockCursor.Visible then return end
+
+	local attachment = getFakeCursorAttachment()
+	local uiScale = getFakeCursorUIScale()
+
+	if attachment and camera then
+		local worldPos = attachment.WorldPosition
+		local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
+		if onScreen then
+			-- 🔸 Actualiza posición
+			ShiftlockCursor.Position = UDim2.fromOffset(
+				screenPos.X + horizontalOffset,
+				screenPos.Y + verticalOffset
+			)
+			ShiftlockCursor.Visible = true
+		else
+			ShiftlockCursor.Visible = false
+		end
+	else
+		ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.5, 0)
+	end
+
+	-- 🔸 Manejo de transparencia según UIScale
+	if uiScale then
+		if math.abs(uiScale.Scale - 1.4) < 0.05 then
+			-- UIScale ≈ 1.4 → ocultar Shiftlock
+			ShiftlockCursor.Visible = false
+		else
+			-- UIScale ≈ 1 → mostrar Shiftlock
+			ShiftlockCursor.Visible = true
+		end
 	end
 end)
 
