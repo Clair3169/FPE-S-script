@@ -1,4 +1,4 @@
--- // LocalScript: Diálogo animado con bordes y animaciones (posición fija)
+-- // LocalScript: Diálogo animado con bordes y animaciones (posición fija + seguridad)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -23,6 +23,10 @@ TextLabel.TextScaled = true
 TextLabel.Visible = false
 TextLabel.ZIndex = 999999
 TextLabel.Parent = ScreenGui
+
+-- Guardar posición/rotación original
+local originalPos = TextLabel.Position
+local originalRot = TextLabel.Rotation
 
 -- Carpetas válidas
 local validFolders = {
@@ -54,6 +58,16 @@ local delayBeforeShow = 3
 local displayDurationTeachers = 11
 local displayDurationAlices = 10
 
+-- Asegurar que el TextLabel esté en la posición correcta
+local function ensureCorrectPosition()
+	if TextLabel.Position ~= originalPos then
+		TextLabel.Position = originalPos
+	end
+	if TextLabel.Rotation ~= originalRot then
+		TextLabel.Rotation = originalRot
+	end
+end
+
 -- Obtener diálogo aleatorio
 local function getRandomDialogue(folderName)
 	local list = dialogues[folderName]
@@ -64,6 +78,8 @@ end
 -- Animación para Teachers
 local function animateTeachers()
 	task.wait(delayBeforeShow)
+	ensureCorrectPosition() -- Seguridad
+
 	TextLabel.TextTransparency = 1
 	TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
 	TextLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
@@ -81,13 +97,13 @@ end
 -- Animación para Alices (olas sin mover posición real)
 local function animateAlices()
 	task.wait(delayBeforeShow)
+	ensureCorrectPosition() -- Seguridad
+
 	TextLabel.TextTransparency = 1
 	TextLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
 	TextLabel.TextStrokeColor3 = Color3.fromRGB(139,0,0)
 	TextLabel.Visible = true
 
-	local originalPos = TextLabel.Position
-	local originalRot = TextLabel.Rotation
 	local waveAmplitude = 0.03
 	local waveDuration = 1.2
 	local rotationAmplitude = 2
@@ -138,8 +154,7 @@ local function animateAlices()
 
 	-- Restaurar
 	running = false
-	TextLabel.Position = originalPos
-	TextLabel.Rotation = originalRot
+	ensureCorrectPosition()
 	TextLabel.Visible = false
 	TextLabel.TextStrokeTransparency = 0
 end
