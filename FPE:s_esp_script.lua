@@ -189,7 +189,7 @@ do
 	ShiftLockButton.BackgroundTransparency = 1
 	ShiftLockButton.AnchorPoint = Vector2.new(1, 1)
 	ShiftLockButton.Position = UDim2.new(1, 0, 1, 0)
-	ShiftLockButton.Size = UDim2.new(0.08, 0, 0.08, 0)
+	ShiftLockButton.Size = UDim2.new(0.100000001, 5, 0.100000001, 5)
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
 
