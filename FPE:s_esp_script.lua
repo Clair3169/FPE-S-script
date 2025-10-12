@@ -171,7 +171,7 @@ do
 	local States = {
 		Off = "rbxassetid://70491444431002",
 		On = "rbxassetid://139177094823080",
-		Lock = "rbxassetid://110850184030204",
+		Lock = "rbxassetid://10546018744",
 		Lock2 = "rbxasset://SystemCursors/Cross"
 	}
 	local MaxLength = 900000
@@ -228,7 +228,7 @@ end
 -- 🔧 Mantiene el cursor centrado sin importar resolución
 -- 🔧 ShiftLockCursor centrado en todas las resoluciones, con offset fijo (80px)
 local verticalOffset = -56
-local horizontalOffset = 6
+local horizontalOffset = 5
 
 RunService.RenderStepped:Connect(function()
 	if not ShiftlockCursor.Visible then return end
