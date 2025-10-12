@@ -171,7 +171,7 @@ do
 	local States = {
 		Off = "rbxassetid://70491444431002",
 		On = "rbxassetid://139177094823080",
-		Lock = "rbxassetid://129593520417631",
+		Lock = "rbxassetid://110850184030204",
 		Lock2 = "rbxasset://SystemCursors/Cross"
 	}
 	local MaxLength = 900000
