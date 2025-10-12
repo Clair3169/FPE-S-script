@@ -1,4 +1,4 @@
--- // LocalScript: Diálogo animado con bordes y animaciones
+-- // LocalScript: Diálogo animado con bordes y animaciones (posición fija)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -17,7 +17,7 @@ local TextLabel = Instance.new("TextLabel")
 TextLabel.Size = UDim2.new(1, 0, 0, 28)
 TextLabel.Position = UDim2.new(0, 0, 0.83, 0)
 TextLabel.BackgroundTransparency = 1
-TextLabel.TextStrokeTransparency = 0 -- visible siempre
+TextLabel.TextStrokeTransparency = 0
 TextLabel.Font = Enum.Font.GothamMedium
 TextLabel.TextScaled = true
 TextLabel.Visible = false
@@ -65,8 +65,8 @@ end
 local function animateTeachers()
 	task.wait(delayBeforeShow)
 	TextLabel.TextTransparency = 1
-	TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- rojo
-	TextLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0) -- borde negro estático
+	TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+	TextLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
 	TextLabel.Visible = true
 
 	TweenService:Create(TextLabel, TweenInfo.new(fadeTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
@@ -78,15 +78,16 @@ local function animateTeachers()
 	TextLabel.Visible = false
 end
 
--- Animación para Alices (olas + rotación + borde palpitante)
+-- Animación para Alices (olas sin mover posición real)
 local function animateAlices()
 	task.wait(delayBeforeShow)
 	TextLabel.TextTransparency = 1
-	TextLabel.TextColor3 = Color3.fromRGB(0, 0, 0) -- negro
-	TextLabel.TextStrokeColor3 = Color3.fromRGB(139,0,0) -- rojo oscuro
+	TextLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+	TextLabel.TextStrokeColor3 = Color3.fromRGB(139,0,0)
 	TextLabel.Visible = true
 
 	local originalPos = TextLabel.Position
+	local originalRot = TextLabel.Rotation
 	local waveAmplitude = 0.03
 	local waveDuration = 1.2
 	local rotationAmplitude = 2
@@ -96,21 +97,17 @@ local function animateAlices()
 	TweenService:Create(TextLabel, TweenInfo.new(fadeTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
 		{TextTransparency = 0}):Play()
 
-	-- Movimiento tipo ola y rotación
+	-- Movimiento tipo ola (simulado)
 	task.spawn(function()
+		local t = 0
 		while running do
-			local upTween = TweenService:Create(TextLabel, TweenInfo.new(waveDuration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-				{Position = originalPos - UDim2.new(0, 0, waveAmplitude, 0)})
-			upTween:Play()
-			upTween.Completed:Wait()
-
-			local downTween = TweenService:Create(TextLabel, TweenInfo.new(waveDuration, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
-				{Position = originalPos + UDim2.new(0, 0, waveAmplitude, 0)})
-			downTween:Play()
-			downTween.Completed:Wait()
+			t += RunService.Heartbeat:Wait()
+			local offset = math.sin(t * (math.pi * 2 / waveDuration)) * waveAmplitude
+			TextLabel.Position = originalPos + UDim2.new(0, 0, offset, 0)
 		end
 	end)
 
+	-- Rotación alternante
 	task.spawn(function()
 		while running do
 			TextLabel.Rotation = rotationAmplitude
@@ -139,9 +136,10 @@ local function animateAlices()
 		{TextTransparency = 1}):Play()
 	task.wait(fadeTime)
 
+	-- Restaurar
 	running = false
 	TextLabel.Position = originalPos
-	TextLabel.Rotation = 0
+	TextLabel.Rotation = originalRot
 	TextLabel.Visible = false
 	TextLabel.TextStrokeTransparency = 0
 end
