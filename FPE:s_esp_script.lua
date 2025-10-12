@@ -193,16 +193,26 @@ do
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
 
-	ShiftlockCursor.Name = "Shiftlock Cursor"
-	ShiftlockCursor.Parent = ShiftLockScreenGui
-	ShiftlockCursor.Image = States.Lock
-	ShiftlockCursor.Size = UDim2.new(0.03, 0, 0.03, 0)
-	ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.4, 7)
-	ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-	ShiftlockCursor.SizeConstraint = Enum.SizeConstraint.RelativeXX
-	ShiftlockCursor.BackgroundTransparency = 1
-	ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-	ShiftlockCursor.Visible = false
+	-- === 🎯 ShiftlockCursor (posición fija en GUI) ===
+
+ShiftlockCursor.Name = "ShiftlockCursor"
+ShiftlockCursor.Parent = ShiftLockScreenGui
+ShiftlockCursor.Image = States.Lock
+ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+ShiftlockCursor.BackgroundTransparency = 1
+ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+ShiftlockCursor.Visible = false
+ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
+	
+-- 🔹 Posición fija sin importar resolución o cambios de pantalla
+ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.400000006, 7)
+
+-- 🧷 Reforzar posición cada frame para evitar desplazamientos
+RunService.RenderStepped:Connect(function()
+	if ShiftlockCursor then
+		ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.400000006, 7)
+	end
+end)
 
 	local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
 	local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
