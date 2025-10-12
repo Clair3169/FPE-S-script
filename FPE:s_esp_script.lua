@@ -193,16 +193,34 @@ do
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
 
-	ShiftlockCursor.Name = "Shiftlock Cursor"
-	ShiftlockCursor.Parent = ShiftLockScreenGui
-	ShiftlockCursor.Image = States.Lock
-	ShiftlockCursor.Size = UDim2.new(0.03, 0, 0.03, 0)
-	ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.4, 7)
-	ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-	ShiftlockCursor.SizeConstraint = Enum.SizeConstraint.RelativeXX
-	ShiftlockCursor.BackgroundTransparency = 1
-	ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-	ShiftlockCursor.Visible = false
+	-- === 🔧 Ajuste automático del cursor del ShiftLock a cualquier resolución ===
+
+ShiftlockCursor.Name = "Shiftlock Cursor"
+ShiftlockCursor.Parent = ShiftLockScreenGui
+ShiftlockCursor.Image = States.Lock
+ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+ShiftlockCursor.BackgroundTransparency = 1
+ShiftlockCursor.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+ShiftlockCursor.Visible = false
+
+-- 🔹 Tamaño dinámico en función de la resolución
+local function updateCursorSize()
+	local viewportSize = camera.ViewportSize
+	local minSide = math.min(viewportSize.X, viewportSize.Y)
+	-- Escala proporcional: más grande en pantallas grandes, más chico en móviles
+	local scale = math.clamp(minSide / 5000, 0.02, 0.05)
+	ShiftlockCursor.Size = UDim2.new(scale, 0, scale, 0)
+	-- Siempre centrado perfectamente en pantalla
+	ShiftlockCursor.Position = UDim2.new(0.5, 0, 0.5, 0)
+end
+
+-- Llamada inicial
+updateCursorSize()
+
+-- 🔁 Se adapta en tiempo real si cambia el tamaño de la pantalla
+camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateCursorSize)
+RunService.RenderStepped:Connect(updateCursorSize)
+
 
 	local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
 	local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
