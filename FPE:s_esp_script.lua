@@ -169,9 +169,9 @@ do
 	local ShiftlockCursor = Instance.new("ImageLabel")
 
 	local States = {
-		Off = "rbxasset://textures/ui/mouseLock_off@2x.png",
-		On = "rbxasset://textures/ui/mouseLock_on@2x.png",
-		Lock = "rbxasset://textures/MouseLockedCursor.png",
+		Off = "rbxassetid://70491444431002",
+		On = "rbxassetid://139177094823080",
+		Lock = "rbxassetid://93711422336612",
 		Lock2 = "rbxasset://SystemCursors/Cross"
 	}
 	local MaxLength = 900000
