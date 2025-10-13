@@ -13,7 +13,7 @@ local Workspace = game:GetService("Workspace")
 
 -- ⚙️ CONFIGURACIÓN
 local STUDENTS_FOLDER = "Students"
-local LIBRARY_TARGET_FOLDERS = {"Teachers", "Alice"}   -- 🎯 solo Teachers y Alice
+local LIBRARY_TARGET_FOLDERS = {"Teachers", "Alices"}   -- 🎯 solo Teachers y Alices
 local BLOOMIE_TARGET_FOLDER = "Students"
 
 -- Prioridades de partes
