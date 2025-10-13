@@ -137,7 +137,7 @@ local function checkAndEnforceSpeed()
 	elseif isInStudents then
 		character:SetAttribute("RunSpeed", 30)
 	else
-		character:SetAttribute("RunSpeed", 28)
+		character:SetAttribute("RunSpeed", 27)
 	end
 end
 
