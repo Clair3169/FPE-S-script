@@ -333,7 +333,7 @@ end)
 
 	local teacherImages = {
 		Thavel = "rbxassetid://126007170470250",
-		Bloomie = "rbxassetid://116769479448758",
+		Bloomie = "rbxassetid://129090409260807",
 		Circle = "rbxassetid://72842137403522",
 		Alice = "rbxassetid://94023609108845",
 		AlicePhase2 = "rbxassetid://78066130044573"
