@@ -236,54 +236,49 @@ local function chooseTarget(models, priorityList)
 	local camPos = Camera.CFrame.Position
 	local camLook = Camera.CFrame.LookVector
 	local bestModel = nil
-	local bestDot = -1
+	local closestDistance = math.huge -- distancia más corta encontrada
 
 	for _, model in ipairs(models) do
-		if not (model and model:IsA("Model")) then
-			-- ignorar
-		else
+		if model and model:IsA("Model") then
 			local part = getTargetPartByPriority(model, priorityList)
 			if part and part.Position then
 				local dir = part.Position - camPos
 				local dist = dir.Magnitude
 				if dist > 0 then
-					-- Preparar RaycastParams
-					local rayParams = RaycastParams.new()
-					rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-					-- Siempre asegurarse que es una tabla (evitar nil)
-					if LocalPlayer and LocalPlayer.Character then
-						rayParams.FilterDescendantsInstances = { LocalPlayer.Character }
-					else
-						rayParams.FilterDescendantsInstances = {}
-					end
-					rayParams.IgnoreWater = true
+					-- Calcular ángulo (dot product)
+					local dirUnit = dir.Unit
+					local dot = camLook:Dot(dirUnit)
 
-					-- Ejecutar raycast sólo hasta la distancia entre cámara y parte objetivo
-					local ok, rayResult = pcall(function()
-						return Workspace:Raycast(camPos, dir.Unit * dist, rayParams)
-					end)
-
-					-- Si pcall fallo, tratar como bloqueado para seguridad
-					local blocked = true
-					if ok then
-						-- Si no hubo impacto => no bloqueado
-						if not rayResult or not rayResult.Instance then
-							blocked = false
+					-- Solo considerar si está dentro del campo de visión permitido
+					if dot >= ANGLE_THRESHOLD then
+						
+						-- ======= 🌐 Verificación de visibilidad (Line of Sight) =======
+						local rayParams = RaycastParams.new()
+						rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+						rayParams.IgnoreWater = true
+						if LocalPlayer and LocalPlayer.Character then
+							rayParams.FilterDescendantsInstances = { LocalPlayer.Character }
 						else
-							-- Si el impacto es descendiente del modelo objetivo => no bloqueado
-							if rayResult.Instance:IsDescendantOf(model) then
-								blocked = false
-							else
-								blocked = true
+							rayParams.FilterDescendantsInstances = {}
+						end
+
+						local ok, rayResult = pcall(function()
+							return Workspace:Raycast(camPos, dirUnit * dist, rayParams)
+						end)
+
+						local visible = false
+						if ok then
+							if not rayResult or not rayResult.Instance then
+								visible = true
+							elseif rayResult.Instance:IsDescendantOf(model) then
+								visible = true
 							end
 						end
-					end
+						-- ============================================================
 
-					if not blocked then
-						local dirUnit = dir.Unit
-						local dot = camLook:Dot(dirUnit)
-						if dot > bestDot then
-							bestDot = dot
+						-- Si el objetivo está visible y más cercano, actualizar
+						if visible and dist < closestDistance then
+							closestDistance = dist
 							bestModel = model
 						end
 					end
@@ -292,11 +287,9 @@ local function chooseTarget(models, priorityList)
 		end
 	end
 
-	if bestDot >= ANGLE_THRESHOLD then
-		return bestModel
-	end
-	return nil
+	return bestModel
 end
+
 
 -- ====== LOOP PRINCIPAL ======
 RunService.RenderStepped:Connect(function()
