@@ -16,9 +16,9 @@ local AIM_PARTS = {
 
 -- También puedes personalizar los offsets verticales para cada modo:
 local AIM_OFFSETS = {
-    LibraryBook = 2,
-    Thavel = 2,
-    Circle = 2,
+    LibraryBook = 2.5,
+    Thavel = 3.0,
+    Circle = 2.8,
     Bloomie = 2.5
 }
 
@@ -121,7 +121,7 @@ local function lockCameraToTargetPart(targetPart, offset)
 
 	-- Compensación: restamos una fracción del tamaño vertical del part (para apuntar al centro visual real)
 	local partHeight = (targetPart.Size and targetPart.Size.Y) or 2
-	local visualCompensation = Vector3.new(0, -partHeight * 2.5, 1)
+	local visualCompensation = Vector3.new(0, -partHeight * 2.5, -2)
 
 	local targetPos = targetPart.Position + appliedOffset + visualCompensation
 	local camPos = camera.CFrame.Position
