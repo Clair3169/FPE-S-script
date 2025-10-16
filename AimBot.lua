@@ -16,10 +16,10 @@ local AIM_PARTS = {
 
 -- También puedes personalizar los offsets verticales para cada modo:
 local AIM_OFFSETS = {
-    LibraryBook = 2.5,
-    Thavel = 3.0,
-    Circle = 2.8,
-    Bloomie = 2.5
+    LibraryBook = 0,
+    Thavel = 0,
+    Circle = 0,
+    Bloomie = 0
 }
 
 -- Configuración del intervalo de búsqueda
@@ -107,28 +107,22 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 local function lockCameraToTargetPart(targetPart, offset)
-	if not targetPart then return end
-	local camera = Workspace.CurrentCamera
-	if not camera then return end
+	-- Asegurarnos de que tanto la parte como la cámara existen.
+	if not targetPart or not Workspace.CurrentCamera then return end
 
-	-- Determinar offset aplicado correctamente
-	local appliedOffset = Vector3.new(0, 0, 0)
-	if typeof(offset) == "Vector3" then
-		appliedOffset = offset
-	elseif typeof(offset) == "number" then
-		appliedOffset = Vector3.new(0, offset, 0)
-	end
+	-- La propiedad .Position de una parte ya es su centro exacto.
+	local targetCenterPosition = targetPart.Position
+	
+	-- Creamos el offset vertical a partir del número que pasamos.
+	-- Si el offset no es un número válido, no se aplicará ninguno.
+	local verticalOffset = Vector3.new(0, (type(offset) == "number" and offset) or 0, 0)
+	
+	-- La posición final a la que la cámara debe apuntar.
+	local finalTargetPosition = targetCenterPosition + verticalOffset
 
-	-- Compensación: restamos una fracción del tamaño vertical del part (para apuntar al centro visual real)
-	local partHeight = (targetPart.Size and targetPart.Size.Y) or 2
-	local visualCompensation = Vector3.new(0, -partHeight * 2.5, -3)
-
-	local targetPos = targetPart.Position + appliedOffset + visualCompensation
-	local camPos = camera.CFrame.Position
-
-	camera.CFrame = CFrame.lookAt(camPos, targetPos)
+	-- Actualizamos el CFrame de la cámara para que mire al punto final.
+	Workspace.CurrentCamera.CFrame = CFrame.lookAt(Workspace.CurrentCamera.CFrame.Position, finalTargetPosition)
 end
-
 
 -- ====== TIMER CHECK (GameUI>Mobile>Alt>Timer) ======
 local function isTimerVisible()
