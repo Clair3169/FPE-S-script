@@ -2,6 +2,28 @@
 -- 🎯 Aimbot combinado (LibraryBook / Thavel / Circle / Bloomie)
 -- - Mejora: Line of Sight robusta + comprobaciones nil + actualización de Camera
 -- =====================================================
+-- ======================================================
+-- ⚙️ CONFIGURACIÓN DE PUNTOS DE APUNTADO POR MODO
+-- ======================================================
+
+-- Puedes modificar estas listas a tu gusto:
+local AIM_PARTS = {
+    LibraryBook = {"HumanoidRootPart", "Torso", "UpperTorso"},
+    Thavel = {"Head", "UpperTorso"},
+    Circle = {"Head"},
+    Bloomie = {"Head", "Torso"}
+}
+
+-- También puedes personalizar los offsets verticales para cada modo:
+local AIM_OFFSETS = {
+    LibraryBook = 2.5,
+    Thavel = 3.0,
+    Circle = 2.8,
+    Bloomie = 2.6
+}
+
+-- Configuración del intervalo de búsqueda
+local TARGET_UPDATE_INTERVAL = 5 -- Cuantos frames esperar entre búsquedas (5 = cada ~0.08s a 60fps)
 
 repeat task.wait() until game:IsLoaded()
 
@@ -86,14 +108,27 @@ end
 
 local function lockCameraToTargetPart(targetPart, offset)
 	if not targetPart then return end
-	if not Camera then Camera = Workspace.CurrentCamera end
-	if not Camera then return end
+	local camera = Workspace.CurrentCamera
+	if not camera then return end
 
-	local camPos = Camera.CFrame.Position
-	local targetPos = targetPart.Position + (offset or Vector3.new(0,0,0))
-	-- Mantener la misma posición de cámara, orientar hacia targetPos
-	Camera.CFrame = CFrame.lookAt(camPos, targetPos)
+	-- Determinar offset aplicado correctamente
+	local appliedOffset = Vector3.new(0, 0, 0)
+	if typeof(offset) == "Vector3" then
+		appliedOffset = offset
+	elseif typeof(offset) == "number" then
+		appliedOffset = Vector3.new(0, offset, 0)
+	end
+
+	-- Compensación: restamos una fracción del tamaño vertical del part (para apuntar al centro visual real)
+	local partHeight = (targetPart.Size and targetPart.Size.Y) or 2
+	local visualCompensation = Vector3.new(0, -partHeight * 2.5, 0)
+
+	local targetPos = targetPart.Position + appliedOffset + visualCompensation
+	local camPos = camera.CFrame.Position
+
+	camera.CFrame = CFrame.lookAt(camPos, targetPos)
 end
+
 
 -- ====== TIMER CHECK (GameUI>Mobile>Alt>Timer) ======
 local function isTimerVisible()
@@ -290,54 +325,57 @@ local function chooseTarget(models, priorityList)
 	return bestModel
 end
 
+-- ======================================================
+-- 🔁 LOOP PRINCIPAL (OPTIMIZADO + CONFIGURABLE)
+-- ======================================================
 
--- ====== LOOP PRINCIPAL ======
+local targetUpdateCounter = 0
+local currentMode = nil
+local currentTarget = nil
+
 RunService.RenderStepped:Connect(function()
-	-- Asegurarse que los servicios y camera estén listos
-	if not LocalPlayer then return end
 	local char = LocalPlayer.Character
-	if not char then
+	if not char then return end
+
+	targetUpdateCounter += 1
+
+	-- ======= Buscar objetivo cada cierto número de frames =======
+	if not currentTarget or targetUpdateCounter >= TARGET_UPDATE_INTERVAL then
+		targetUpdateCounter = 0
 		currentTarget = nil
-		return
+		currentMode = nil
+
+		-- Buscar objetivos por modo
+		local libTargets = getLibraryBookTargets()
+		local thavelTargets = getThavelTargets()
+		local circleTargets = getCircleTargets()
+		local bloomTargets = getBloomieTargets()
+
+		if #libTargets > 0 then
+			currentTarget = chooseTarget(libTargets, AIM_PARTS.LibraryBook)
+			currentMode = "LibraryBook"
+		elseif #thavelTargets > 0 then
+			currentTarget = chooseTarget(thavelTargets, AIM_PARTS.Thavel)
+			currentMode = "Thavel"
+		elseif #circleTargets > 0 then
+			currentTarget = chooseTarget(circleTargets, AIM_PARTS.Circle)
+			currentMode = "Circle"
+		elseif #bloomTargets > 0 then
+			currentTarget = chooseTarget(bloomTargets, AIM_PARTS.Bloomie)
+			currentMode = "Bloomie"
+		end
 	end
 
-	-- Mantener Camera actualizada si estaba a nil
-	if not Camera then
-		Camera = Workspace.CurrentCamera
-		if not Camera then return end
-	end
-
-	local libTargets = getLibraryBookTargets()
-	local thavelTargets = getThavelTargets()
-	local circleTargets = getCircleTargets()
-	local bloomTargets = getBloomieTargets()
-
-	local targetPart, offset
-
-	if #libTargets > 0 then
-		currentTarget = chooseTarget(libTargets, TARGET_PRIORITY_TORSO)
-		targetPart = currentTarget and getTargetPartByPriority(currentTarget, TARGET_PRIORITY_TORSO)
-		offset = CAMERA_HEIGHT_OFFSET_TORSO
-
-	elseif #thavelTargets > 0 then
-		currentTarget = chooseTarget(thavelTargets, TARGET_PRIORITY_HEAD)
-		targetPart = currentTarget and getTargetPartByPriority(currentTarget, TARGET_PRIORITY_HEAD)
-		offset = CAMERA_HEIGHT_OFFSET_HEAD
-
-	elseif #circleTargets > 0 then
-		currentTarget = chooseTarget(circleTargets, TARGET_PRIORITY_HEAD)
-		targetPart = currentTarget and getTargetPartByPriority(currentTarget, TARGET_PRIORITY_HEAD)
-		offset = CAMERA_HEIGHT_OFFSET_HEAD
-
-	elseif #bloomTargets > 0 then
-		currentTarget = chooseTarget(bloomTargets, TARGET_PRIORITY_HEAD)
-		targetPart = currentTarget and getTargetPartByPriority(currentTarget, TARGET_PRIORITY_HEAD)
-		offset = CAMERA_HEIGHT_OFFSET_HEAD
-	else
-		currentTarget = nil
-	end
-
-	if targetPart then
-		lockCameraToTargetPart(targetPart, offset)
+	-- ======= Apuntar (en todos los frames) =======
+	if currentTarget and currentMode then
+		local targetParts = AIM_PARTS[currentMode]
+		local targetPart = getTargetPartByPriority(currentTarget, targetParts)
+		if targetPart then
+			local offset = AIM_OFFSETS[currentMode] or 2.5
+			lockCameraToTargetPart(targetPart, offset)
+		else
+			currentTarget = nil
+			currentMode = nil
+		end
 	end
 end)
