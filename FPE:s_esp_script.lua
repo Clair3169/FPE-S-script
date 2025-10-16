@@ -210,14 +210,25 @@ if buttonText == "Sí" then
     forzarTerceraPersonaYShiftLock = false
     ShiftLockButton.Visible = false -- Oculta el botón de ShiftLock
 
-    -- ✨ Fuerza la cámara en primera persona permanentemente ✨
+    -- ✨ Modo primera persona prioritario pero fluido ✨
     player.CameraMode = Enum.CameraMode.LockFirstPerson
 
-    -- Refuerzo constante para evitar que se salga del modo primera persona
+    -- Permite que otros scripts cambien la cámara, pero recupera suavemente el control
     task.spawn(function()
-        while task.wait(1) do
+        while task.wait(0.5) do
+            -- Si otro script cambia la cámara, esperamos un poco antes de recuperarla
             if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
-                player.CameraMode = Enum.CameraMode.LockFirstPerson
+                task.wait(1.5) -- pequeña espera para no pelear con otros scripts
+                if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+                    -- transición suave
+                    local cam = workspace.CurrentCamera
+                    local targetCFrame = cam.CFrame
+                    for i = 1, 15 do
+                        cam.CFrame = cam.CFrame:Lerp(targetCFrame, i / 15)
+                        task.wait(0.02)
+                    end
+                    player.CameraMode = Enum.CameraMode.LockFirstPerson
+                end
             end
         end
     end)
