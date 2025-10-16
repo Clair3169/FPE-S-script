@@ -19,7 +19,7 @@ local AIM_OFFSETS = {
     LibraryBook = 0,
     Thavel = 0,
     Circle = 0,
-    Bloomie = 0
+    Bloomie = 1
 }
 
 -- Configuración del intervalo de búsqueda
