@@ -1,0 +1,20 @@
+wait(1)
+local function callback(text)
+    if text == "Yes" then
+    print("User said yes")
+    elseif text == "No" then
+    print("User said no")
+    end
+end
+ 
+local bindableFunction= Instance.new("BindableFunction")
+ 
+game.StarterGui:SetCore("SendNotification", {
+    Title = "TITLE";
+    Text = "TEXT";
+    Icon = "RBXID OR BLANK";
+    Duration = "DURATION IN SECONDS";
+    callbakc = bindableFunction;
+    Button1 = "BUTTON1 TEXT";
+    Button2 = "BUTTON2 TEXT";
+})
