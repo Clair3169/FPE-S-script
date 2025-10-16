@@ -107,21 +107,31 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 local function lockCameraToTargetPart(targetPart, offset)
-	-- Asegurarnos de que tanto la parte como la cámara existen.
-	if not targetPart or not Workspace.CurrentCamera then return end
+	-- Obtenemos el personaje del jugador y su cabeza. Si no existen, no hacemos nada.
+	local character = LocalPlayer.Character
+	local head = character and character:FindFirstChild("Head")
+	
+	if not targetPart or not Workspace.CurrentCamera or not head then 
+		return 
+	end
 
-	-- La propiedad .Position de una parte ya es su centro exacto.
+	-- 1. Calculamos la posición final del objetivo (esto ya lo tenías bien)
 	local targetCenterPosition = targetPart.Position
-	
-	-- Creamos el offset vertical a partir del número que pasamos.
-	-- Si el offset no es un número válido, no se aplicará ninguno.
 	local verticalOffset = Vector3.new(0, (type(offset) == "number" and offset) or 0, 0)
-	
-	-- La posición final a la que la cámara debe apuntar.
 	local finalTargetPosition = targetCenterPosition + verticalOffset
 
-	-- Actualizamos el CFrame de la cámara para que mire al punto final.
-	Workspace.CurrentCamera.CFrame = CFrame.lookAt(Workspace.CurrentCamera.CFrame.Position, finalTargetPosition)
+	-- 2. Calculamos la nueva POSICIÓN de la cámara para que siga al jugador
+	-- Mantenemos la distancia de zoom actual que el jugador tiene con su personaje.
+	local currentZoomDistance = (Workspace.CurrentCamera.CFrame.Position - head.Position).Magnitude
+	
+	-- Calculamos la dirección desde el objetivo hacia la cabeza de nuestro jugador.
+	local directionFromTargetToHead = (head.Position - finalTargetPosition).Unit
+	
+	-- La nueva posición de la cámara será detrás de la cabeza del jugador, a la distancia de zoom actual.
+	local newCameraPosition = head.Position + (directionFromTargetToHead * currentZoomDistance)
+
+	-- 3. Actualizamos la cámara para que esté en la nueva posición y apunte al objetivo.
+	Workspace.CurrentCamera.CFrame = CFrame.lookAt(newCameraPosition, finalTargetPosition)
 end
 
 -- ====== TIMER CHECK (GameUI>Mobile>Alt>Timer) ======
