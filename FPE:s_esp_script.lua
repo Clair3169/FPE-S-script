@@ -168,6 +168,11 @@ do
 	local ShiftLockButton = Instance.new("ImageButton")
 	local ShiftlockCursor = Instance.new("ImageLabel")
 
+	-- ================================================================================
+	-- ✨ MODIFICACIÓN 1: Variable para controlar si la cámara forzada está activa
+	-- ================================================================================
+	local forzarTerceraPersonaYShiftLock = true
+	
 	local States = {
 		Off = "rbxassetid://70491444431002",
 		On = "rbxassetid://139177094823080",
@@ -193,80 +198,113 @@ do
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
 
--- === 🎯 ShiftlockCursor — sigue el FakeCursor + offset + transparencia por UIScale ===
+	-- ================================================================================
+	-- ✨ MODIFICACIÓN 2: Notificación para preguntar al jugador
+	-- ================================================================================
+	task.wait(1) -- Pequeña espera para que la GUI cargue
+	
+	local function notificationCallback(buttonText)
+		-- Dentro de la función notificationCallback
+if buttonText == "Sí" then
+    -- El jugador eligió desactivar la cámara forzada y el ShiftLock
+    forzarTerceraPersonaYShiftLock = false
+    ShiftLockButton.Visible = false -- Oculta el botón de ShiftLock
 
-ShiftlockCursor.Name = "ShiftlockCursor"
-ShiftlockCursor.Parent = ShiftLockScreenGui
-ShiftlockCursor.Image = States.Lock
-ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-ShiftlockCursor.BackgroundTransparency = 1
-ShiftlockCursor.Visible = false
-ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
+    -- ✨ Fuerza la cámara en primera persona permanentemente ✨
+    player.CameraMode = Enum.CameraMode.LockFirstPerson
 
-local function getFakeCursorAttachment()
-	local debris = Workspace:FindFirstChild("Debris")
-	if not debris then return nil end
-	local fake = debris:FindFirstChild("FakeCursor")
-	if not fake then return nil end
-	return fake:FindFirstChild("Attachment")
+    -- Refuerzo constante para evitar que se salga del modo primera persona
+    task.spawn(function()
+        while task.wait(1) do
+            if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+                player.CameraMode = Enum.CameraMode.LockFirstPerson
+            end
+        end
+    end)
 end
-
-local function getFakeCursorUIScale()
-	local debris = Workspace:FindFirstChild("Debris")
-	if not debris then return nil end
-	local fake = debris:FindFirstChild("FakeCursor")
-	if not fake then return nil end
-	local attach = fake:FindFirstChild("Attachment")
-	if not attach then return nil end
-	local gui = attach:FindFirstChild("BillboardGui")
-	if not gui then return nil end
-	local frame = gui:FindFirstChild("Frame")
-	if not frame then return nil end
-	return frame:FindFirstChildOfClass("UIScale")
-end
-
--- 🔧 Mantiene el cursor centrado sin importar resolución
--- 🔧 ShiftLockCursor centrado en todas las resoluciones, con offset fijo (80px)
-local verticalOffset = -56
-local horizontalOffset = 5
-
-RunService.RenderStepped:Connect(function()
-	if not ShiftlockCursor.Visible then return end
-
-	local attachment = getFakeCursorAttachment()
-	local uiScale = getFakeCursorUIScale()
-	local viewport = camera.ViewportSize
-	local centerX = viewport.X / 2
-	local centerY = viewport.Y / 2
-
-	if attachment and camera then
-		local worldPos = attachment.WorldPosition
-		local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
-
-		if onScreen then
-			-- 🔸 Mantiene el cursor centrado visualmente, con offset fijo de 80px
-			ShiftlockCursor.Position = UDim2.fromOffset(
-				centerX + horizontalOffset,
-				centerY + verticalOffset
-			)
-			ShiftlockCursor.Visible = true
-		else
-			ShiftlockCursor.Visible = false
-		end
-	else
-		-- 🔸 Si no hay attachment, centra el cursor igual con el offset
-		ShiftlockCursor.Position = UDim2.fromOffset(centerX + horizontalOffset, centerY + verticalOffset)
+		-- Si el jugador presiona "No", no hacemos nada y todo sigue como antes
 	end
 
-	-- 🔸 Manejo de visibilidad según UIScale (como antes)
-	if uiScale then
-		if math.abs(uiScale.Scale - 1.4) < 0.05 then
-			ShiftlockCursor.Visible = false
-		else
-			ShiftlockCursor.Visible = true
-		end
+	local bindableFunction = Instance.new("BindableFunction")
+	bindableFunction.OnInvoke = notificationCallback
+
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+		Title = "Configuración de Cámara";
+		Text = "¿Deseas desactivar la 3ra persona forzada y el botón de ShiftLock?";
+		Icon = ""; -- Sin ícono
+		Duration = 15; -- Duración en segundos
+		Callback = bindableFunction; -- La función que se ejecuta al presionar un botón
+		Button1 = "Sí";
+		Button2 = "No";
+	})
+	
+	ShiftlockCursor.Name = "ShiftlockCursor"
+	ShiftlockCursor.Parent = ShiftLockScreenGui
+	ShiftlockCursor.Image = States.Lock
+	ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+	ShiftlockCursor.BackgroundTransparency = 1
+	ShiftlockCursor.Visible = false
+	ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
+
+	local function getFakeCursorAttachment()
+		local debris = Workspace:FindFirstChild("Debris")
+		if not debris then return nil end
+		local fake = debris:FindFirstChild("FakeCursor")
+		if not fake then return nil end
+		return fake:FindFirstChild("Attachment")
 	end
-end)
+
+	local function getFakeCursorUIScale()
+		local debris = Workspace:FindFirstChild("Debris")
+		if not debris then return nil end
+		local fake = debris:FindFirstChild("FakeCursor")
+		if not fake then return nil end
+		local attach = fake:FindFirstChild("Attachment")
+		if not attach then return nil end
+		local gui = attach:FindFirstChild("BillboardGui")
+		if not gui then return nil end
+		local frame = gui:FindFirstChild("Frame")
+		if not frame then return nil end
+		return frame:FindFirstChildOfClass("UIScale")
+	end
+
+	local verticalOffset = -56
+	local horizontalOffset = 5
+
+	RunService.RenderStepped:Connect(function()
+		if not ShiftlockCursor.Visible then return end
+
+		local attachment = getFakeCursorAttachment()
+		local uiScale = getFakeCursorUIScale()
+		local viewport = camera.ViewportSize
+		local centerX = viewport.X / 2
+		local centerY = viewport.Y / 2
+
+		if attachment and camera then
+			local worldPos = attachment.WorldPosition
+			local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
+
+			if onScreen then
+				ShiftlockCursor.Position = UDim2.fromOffset(
+					centerX + horizontalOffset,
+					centerY + verticalOffset
+				)
+				ShiftlockCursor.Visible = true
+			else
+				ShiftlockCursor.Visible = false
+			end
+		else
+			ShiftlockCursor.Position = UDim2.fromOffset(centerX + horizontalOffset, centerY + verticalOffset)
+		end
+
+		if uiScale then
+			if math.abs(uiScale.Scale - 1.4) < 0.05 then
+				ShiftlockCursor.Visible = false
+			else
+				ShiftlockCursor.Visible = true
+			end
+		end
+	end)
 
 	local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
 	local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
@@ -473,30 +511,41 @@ end)
 		plr.CameraMinZoomDistance = MIN_ZOOM
 		plr.CameraMaxZoomDistance = MAX_ZOOM
 	end
-
+	
+	-- ================================================================================
+	-- ✨ MODIFICACIÓN 3: Se condiciona la ejecución de la cámara forzada
+	-- ================================================================================
 	task.spawn(function()
 		while task.wait(1) do
-			for _, plr in ipairs(Players:GetPlayers()) do
-				if plr.CameraMode == Enum.CameraMode.LockFirstPerson then
-					forceThirdPerson(plr)
+			-- Solo se ejecuta si el jugador no eligió desactivarlo
+			if forzarTerceraPersonaYShiftLock then
+				for _, plr in ipairs(Players:GetPlayers()) do
+					if plr.CameraMode == Enum.CameraMode.LockFirstPerson then
+						forceThirdPerson(plr)
+					end
 				end
 			end
 		end
 	end)
 
 	Players.PlayerAdded:Connect(function(plr)
-		forceThirdPerson(plr)
-		plr.CharacterAdded:Connect(function()
-			task.wait(0.5)
+		if forzarTerceraPersonaYShiftLock then
 			forceThirdPerson(plr)
-		end)
+			plr.CharacterAdded:Connect(function()
+				task.wait(0.5)
+				forceThirdPerson(plr)
+			end)
+		end
 	end)
+	
 	for _, plr in ipairs(Players:GetPlayers()) do
-		forceThirdPerson(plr)
-		plr.CharacterAdded:Connect(function()
-			task.wait(0.5)
+		if forzarTerceraPersonaYShiftLock then
 			forceThirdPerson(plr)
-		end)
+			plr.CharacterAdded:Connect(function()
+				task.wait(0.5)
+				forceThirdPerson(plr)
+			end)
+		end
 	end
 
 	local area = Workspace:WaitForChild("Area")
@@ -553,35 +602,26 @@ end)
 
 	sprintButton.Visible = false
 
-	-- 🔹 Si el jugador reaparece en cualquiera de las 3 carpetas, ocultar Sprint
-local function hideSprintIfInFolders()
-	local foldersToCheck = {
-		game.Workspace:FindFirstChild("Students"),
-		game.Workspace:FindFirstChild("Alices"),
-		game.Workspace:FindFirstChild("Teachers")
-	}
+	local function hideSprintIfInFolders()
+		local foldersToCheck = {
+			game.Workspace:FindFirstChild("Students"),
+			game.Workspace:FindFirstChild("Alices"),
+			game.Workspace:FindFirstChild("Teachers")
+		}
 
-	for _, folder in ipairs(foldersToCheck) do
-		if folder and folder:FindFirstChild(player.Name) then
-			sprintButton.Visible = false
-			return
+		for _, folder in ipairs(foldersToCheck) do
+			if folder and folder:FindFirstChild(player.Name) then
+				sprintButton.Visible = false
+				return
+			end
 		end
 	end
-end
 
--- Ejecutar cuando el jugador reaparece
-player.CharacterAdded:Connect(function(character)
-	task.wait(0.5)
-	hideSprintIfInFolders()
-end)
-
--- También verificar cada pocos segundos por seguridad
--- task.spawn(function()
---	while task.wait(2) do
---		hideSprintIfInFolders()
---	end
---end)
-
+	player.CharacterAdded:Connect(function(character)
+		task.wait(0.5)
+		hideSprintIfInFolders()
+	end)
+	
 	local sprintInfButton = sprintButton:Clone()
 	sprintInfButton.Name = "Sprint_Inf"
 	sprintInfButton.Visible = true
@@ -594,7 +634,7 @@ end)
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
 		if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift
-		or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+			or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
 			toggleRunning()
 		end
 	end)
