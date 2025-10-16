@@ -341,6 +341,24 @@ RunService.RenderStepped:Connect(function()
 	local char = LocalPlayer.Character
 	if not char then return end
 
+	-- =================================================================
+	-- ✅ NUEVA VERIFICACIÓN PARA EL COOLDOWN DE CIRCLE (LA SOLUCIÓN)
+	-- Esto se ejecuta en cada frame para desactivar el aimbot al instante.
+	-- =================================================================
+	if currentMode == "Circle" and isTimerVisible() then
+		circleActive = false      -- Desactivamos el toggle
+		currentTarget = nil       -- Limpiamos el objetivo
+		currentMode = nil         -- Limpiamos el modo actual
+		
+		-- Actualizamos la transparencia del botón si existe
+		if circleButtonReference then
+			pcall(function() circleButtonReference.ImageTransparency = 0.5 end)
+		end
+		
+		return -- Detenemos la ejecución de este frame, ya no hay nada más que hacer.
+	end
+	-- =================================================================
+
 	targetUpdateCounter += 1
 
 	-- ======= Buscar objetivo cada cierto número de frames =======
