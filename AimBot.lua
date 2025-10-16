@@ -330,7 +330,7 @@ local function chooseTarget(models, priorityList)
 end
 
 -- ======================================================
--- 🔁 LOOP PRINCIPAL (OPTIMIZADO + CONFIGURABLE)
+-- 🔁 LOOP PRINCIPAL (VERSIÓN FINAL CON MÁXIMA SEGURIDAD)
 -- ======================================================
 
 local targetUpdateCounter = 0
@@ -339,23 +339,54 @@ local currentTarget = nil
 
 RunService.RenderStepped:Connect(function()
 	local char = LocalPlayer.Character
-	if not char then return end
+	if not char then 
+		if currentMode == "Circle" then
+			circleActive = false
+			if circleButtonReference then pcall(function() circleButtonReference.ImageTransparency = 0.5 end) end
+		end
+		currentTarget = nil
+		currentMode = nil
+		return 
+	end
 
 	-- =================================================================
-	-- ✅ NUEVA VERIFICACIÓN PARA EL COOLDOWN DE CIRCLE (LA SOLUCIÓN)
-	-- Esto se ejecuta en cada frame para desactivar el aimbot al instante.
+	-- 🛡️ SUPERBLOQUE DE SEGURIDAD PARA TODOS LOS MODOS 🛡️
+	-- Se ejecuta en cada frame para una desactivación instantánea.
 	-- =================================================================
-	if currentMode == "Circle" and isTimerVisible() then
-		circleActive = false      -- Desactivamos el toggle
-		currentTarget = nil       -- Limpiamos el objetivo
-		currentMode = nil         -- Limpiamos el modo actual
-		
-		-- Actualizamos la transparencia del botón si existe
-		if circleButtonReference then
-			pcall(function() circleButtonReference.ImageTransparency = 0.5 end)
+	if currentMode then
+		local conditionsMet = true -- Asumimos que todo está bien al principio
+
+		if currentMode == "Circle" then
+			if char:GetAttribute("TeacherName") ~= "Circle" or isTimerVisible() then
+				conditionsMet = false
+				circleActive = false -- Específico de Circle
+				if circleButtonReference then pcall(function() circleButtonReference.ImageTransparency = 0.5 end) end
+			end
+
+		elseif currentMode == "Thavel" then
+			if char:GetAttribute("TeacherName") ~= "Thavel" or not char:GetAttribute("Charging") then
+				conditionsMet = false
+			end
+
+		elseif currentMode == "LibraryBook" then
+			if not hasLibraryBook(char) then
+				conditionsMet = false
+			end
+
+		elseif currentMode == "Bloomie" then
+			local teachersFolder = Workspace:FindFirstChild("Teachers")
+			local myModel = teachersFolder and teachersFolder:FindFirstChild(LocalPlayer.Name or "")
+			if not myModel or myModel:GetAttribute("TeacherName") ~= "Bloomie" or not myModel:GetAttribute("Aiming") then
+				conditionsMet = false
+			end
 		end
-		
-		return -- Detenemos la ejecución de este frame, ya no hay nada más que hacer.
+
+		-- Si alguna condición falló, limpiamos y salimos.
+		if not conditionsMet then
+			currentTarget = nil
+			currentMode = nil
+			return
+		end
 	end
 	-- =================================================================
 
@@ -367,7 +398,6 @@ RunService.RenderStepped:Connect(function()
 		currentTarget = nil
 		currentMode = nil
 
-		-- Buscar objetivos por modo
 		local libTargets = getLibraryBookTargets()
 		local thavelTargets = getThavelTargets()
 		local circleTargets = getCircleTargets()
