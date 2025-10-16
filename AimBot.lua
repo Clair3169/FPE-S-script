@@ -16,10 +16,10 @@ local AIM_PARTS = {
 
 -- También puedes personalizar los offsets verticales para cada modo:
 local AIM_OFFSETS = {
-    LibraryBook = 2.5,
-    Thavel = 3.0,
-    Circle = 2.8,
-    Bloomie = 2.6
+    LibraryBook = 1,
+    Thavel = 1,
+    Circle = 1,
+    Bloomie = 1
 }
 
 -- Configuración del intervalo de búsqueda
@@ -34,7 +34,7 @@ local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 
 -- ====== CONFIG ======
-local LIBRARY_TARGET_FOLDERS = {"Teachers", "Alices"}
+local LIBRARY_TARGET_FOLDERS = {"Teachers", "Alices", "Students"}
 local THAVEL_TARGET_FOLDERS  = {"Students", "Alices"}
 local CIRCLE_TARGET_FOLDERS  = {"Students", "Alices"}
 local BLOOMIE_TARGET_FOLDERS = {"Students", "Alices"}
