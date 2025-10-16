@@ -16,10 +16,10 @@ local AIM_PARTS = {
 
 -- También puedes personalizar los offsets verticales para cada modo:
 local AIM_OFFSETS = {
-    LibraryBook = 1,
-    Thavel = 1,
-    Circle = 1,
-    Bloomie = 1
+    LibraryBook = 2,
+    Thavel = 2,
+    Circle = 2,
+    Bloomie = 2.5
 }
 
 -- Configuración del intervalo de búsqueda
