@@ -9,8 +9,8 @@
 -- Puedes modificar estas listas a tu gusto:
 local AIM_PARTS = {
     LibraryBook = {"HumanoidRootPart", "Torso", "UpperTorso"},
-    Thavel = {"Head", "UpperTorso"},
-    Circle = {"Head"},
+    Thavel = {"UpperTorso", "Torso"},
+    Circle = {"UpperTorso", "Head"},
     Bloomie = {"Head", "Torso"}
 }
 
