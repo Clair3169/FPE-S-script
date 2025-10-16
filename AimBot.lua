@@ -121,7 +121,7 @@ local function lockCameraToTargetPart(targetPart, offset)
 
 	-- Compensación: restamos una fracción del tamaño vertical del part (para apuntar al centro visual real)
 	local partHeight = (targetPart.Size and targetPart.Size.Y) or 2
-	local visualCompensation = Vector3.new(0, -partHeight * 2.5, 0)
+	local visualCompensation = Vector3.new(0, -partHeight * 2.5, 1)
 
 	local targetPos = targetPart.Position + appliedOffset + visualCompensation
 	local camPos = camera.CFrame.Position
