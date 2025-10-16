@@ -34,7 +34,7 @@ local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 
 -- ====== CONFIG ======
-local LIBRARY_TARGET_FOLDERS = {"Teachers", "Alices", "Students"}
+local LIBRARY_TARGET_FOLDERS = {"Teachers", "Alices"}
 local THAVEL_TARGET_FOLDERS  = {"Students", "Alices"}
 local CIRCLE_TARGET_FOLDERS  = {"Students", "Alices"}
 local BLOOMIE_TARGET_FOLDERS = {"Students", "Alices"}
