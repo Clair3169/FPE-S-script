@@ -153,11 +153,11 @@ end
 -- 🅱️ BLOQUE B — HELLA MODE REMAKE + FLOATING IMAGES + CÁMARA + SHIFTLOCK + SPRINT
 ------------------------------------------------------------------------------------
 do
-	-- 🔒 Controla si el script puede modificar la cámara (espera a que el jugador elija)
+	-- 🔧 Control del modo de cámara
 local camaraEsperandoRespuesta = true
 local forzarTerceraPersonaYShiftLock = true
-local modoLibre = false
-local otroScriptControlandoCamara = false
+local modoPredeterminado = false -- se activa si el jugador elige "Sí"
+
 
 	local CoreGui = game:GetService("CoreGui")
 	local Players = game:GetService("Players")
@@ -214,17 +214,22 @@ local otroScriptControlandoCamara = false
 
 	local function notificationCallback(buttonText)
 	if buttonText == "Sí" then
-		-- Dejar la cámara como está por defecto del juego
+		-- ✅ Modo predeterminado del juego: no tocamos nada
 		forzarTerceraPersonaYShiftLock = false
-		print("[Cámara] Se mantiene configuración predeterminada del juego.")
+		modoPredeterminado = true
+		ShiftLockButton.Visible = false
+		print("[Cámara] Modo predeterminado activado. No se tocará la cámara.")
 	else
+		-- 🚫 Modo forzado (ShiftLock + 3ra persona)
 		forzarTerceraPersonaYShiftLock = true
+		modoPredeterminado = false
 		ShiftLockButton.Visible = true
 		print("[Cámara] Tercera persona forzada activada.")
 	end
 
 	camaraEsperandoRespuesta = false
 end
+
 
 	local bindableFunction = Instance.new("BindableFunction")
 	bindableFunction.OnInvoke = notificationCallback
@@ -510,11 +515,13 @@ local MIN_ZOOM = 4
 local MAX_ZOOM = 100
 
 local function forceThirdPerson(plr)
-	if camaraEsperandoRespuesta then return end -- ❗ Evita que se ejecute antes
+	if camaraEsperandoRespuesta then return end
+	if not forzarTerceraPersonaYShiftLock then return end -- 👈 No hacer nada si está en modo libre
 	plr.CameraMode = Enum.CameraMode.Classic
 	plr.CameraMinZoomDistance = MIN_ZOOM
 	plr.CameraMaxZoomDistance = MAX_ZOOM
 end
+
 
 
 	
@@ -540,14 +547,14 @@ end)
 
 	
 	Players.PlayerAdded:Connect(function(plr)
-		if forzarTerceraPersonaYShiftLock then
+	plr.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		if not modoPredeterminado then
 			forceThirdPerson(plr)
-			plr.CharacterAdded:Connect(function()
-				task.wait(0.5)
-				forceThirdPerson(plr)
-			end)
 		end
 	end)
+end)
+
 	
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if forzarTerceraPersonaYShiftLock then
