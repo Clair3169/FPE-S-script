@@ -207,29 +207,27 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 	ShiftLockButton.Size = UDim2.new(0.100000001, 5, 0.100000001, 5)
 	ShiftLockButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	ShiftLockButton.Image = States.Off
+	ShiftLockButton.Visible = false -- 🔒 Oculto al inicio hasta que elija “No”
 
 	-- ================================================================================
 	-- ✨ MODIFICACIÓN 2: Notificación para preguntar al jugador
 	-- ================================================================================
-
+	
 	local function notificationCallback(buttonText)
 	if buttonText == "Sí" then
-		-- ✅ Modo predeterminado del juego: no tocamos nada
 		forzarTerceraPersonaYShiftLock = false
 		modoPredeterminado = true
-		ShiftLockButton.Visible = false
+		ShiftLockButton.Visible = false -- 👈 se mantiene oculto siempre
 		print("[Cámara] Modo predeterminado activado. No se tocará la cámara.")
 	else
-		-- 🚫 Modo forzado (ShiftLock + 3ra persona)
 		forzarTerceraPersonaYShiftLock = true
 		modoPredeterminado = false
-		ShiftLockButton.Visible = true
+		ShiftLockButton.Visible = true -- 👈 solo se muestra si elige “No”
 		print("[Cámara] Tercera persona forzada activada.")
 	end
 
 	camaraEsperandoRespuesta = false
 end
-
 
 	local bindableFunction = Instance.new("BindableFunction")
 	bindableFunction.OnInvoke = notificationCallback
@@ -550,6 +548,7 @@ end)
 	plr.CharacterAdded:Connect(function()
 		task.wait(0.5)
 		if not modoPredeterminado then
+			ShiftLockButton.Visible = false			
 			forceThirdPerson(plr)
 		end
 	end)
