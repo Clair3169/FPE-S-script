@@ -213,7 +213,7 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 	-- ================================================================================
 	
 	local function notificationCallback(buttonText)
-	if buttonText == "YES!!" then
+	if buttonText == "Nha" then
 		forzarTerceraPersonaYShiftLock = false
 		modoPredeterminado = true
 		ShiftLockButton.Visible = false -- 👈 se mantiene oculto siempre
@@ -235,8 +235,8 @@ end
 		Icon = ""; -- Sin ícono
 		Duration = 15; -- Duración en segundos
 		Callback = bindableFunction; -- La función que se ejecuta al presionar un botón
-		Button1 = "YES!!";
-		Button2 = "Nha";
+		Button1 = "Nha";
+		Button2 = "Yess!!";
 	})
 	
 	ShiftlockCursor.Name = "ShiftlockCursor"
