@@ -322,17 +322,25 @@ end
 
 	
 	ShiftLockButton.MouseButton1Click:Connect(function()
-	if modoPredeterminado then return end
-
-	if not Active then
-		-- Activar ShiftLock
-		Active = RunService.RenderStepped:Connect(function()
-			if player.Character and player.Character:FindFirstChild("Humanoid") then
-				player.Character.Humanoid.AutoRotate = false
-				ShiftLockButton.Image = States.On
-				ShiftlockCursor.Visible = true
-				-- Ajuste de cámara solo si está permitido
-				if forzarTerceraPersonaYShiftLock and player.Character:FindFirstChild("HumanoidRootPart") then
+		if not Active then
+			Active = RunService.RenderStepped:Connect(function()
+				if player.Character and player.Character:FindFirstChild("Humanoid") then
+					player.Character.Humanoid.AutoRotate = false
+					ShiftLockButton.Image = States.On
+					ShiftlockCursor.Visible = true
+					if frame and uiStroke.Thickness ~= 1.5 then
+						frame.Visible = false
+					end
+					if player.Character:FindFirstChild("HumanoidRootPart") then
+						player.Character.HumanoidRootPart.CFrame = CFrame.new(
+							player.Character.HumanoidRootPart.Position,
+							Vector3.new(
+								camera.CFrame.LookVector.X * MaxLength,
+								player.Character.HumanoidRootPart.Position.Y,
+								camera.CFrame.LookVector.Z * MaxLength
+							)
+						)
+					end
 					camera.CFrame = camera.CFrame * EnabledOffset
 					camera.Focus = CFrame.fromMatrix(
 						camera.Focus.Position,
@@ -340,25 +348,23 @@ end
 						camera.CFrame.UpVector
 					) * EnabledOffset
 				end
+			end)
+		else
+			if player.Character and player.Character:FindFirstChild("Humanoid") then
+				player.Character.Humanoid.AutoRotate = true
 			end
-		end)
-	else
-		-- Desactivar ShiftLock
-		if player.Character and player.Character:FindFirstChild("Humanoid") then
-			player.Character.Humanoid.AutoRotate = true
-		end
-		ShiftLockButton.Image = States.Off
-		ShiftlockCursor.Visible = false
-		if forzarTerceraPersonaYShiftLock then
+			ShiftLockButton.Image = States.Off
 			camera.CFrame = camera.CFrame * DisabledOffset
+			ShiftlockCursor.Visible = false
+			if frame and uiStroke.Thickness ~= 1.5 then
+				frame.Visible = true
+			end
+			pcall(function()
+				Active:Disconnect()
+				Active = nil
+			end)
 		end
-		pcall(function()
-			Active:Disconnect()
-			Active = nil
-		end)
-	end
-end)
-
+	end)
 
 	local function ShiftLock() end
 	ContextActionService:BindAction("Shift Lock", ShiftLock, false, "On")
