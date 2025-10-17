@@ -213,7 +213,7 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 	-- ================================================================================
 	
 	local function notificationCallback(buttonText)
-	if buttonText == "Sí" then
+	if buttonText == "YES!!" then
 		forzarTerceraPersonaYShiftLock = false
 		modoPredeterminado = true
 		ShiftLockButton.Visible = false -- 👈 se mantiene oculto siempre
