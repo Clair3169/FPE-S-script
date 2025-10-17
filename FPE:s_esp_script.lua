@@ -172,6 +172,10 @@ do
 	-- ✨ MODIFICACIÓN 1: Variable para controlar si la cámara forzada está activa
 	-- ================================================================================
 	local forzarTerceraPersonaYShiftLock = true
+	-- 🔸 NUEVAS VARIABLES DE CONTROL DE CÁMARA
+    local modoPrimeraPersona = false
+    local otroScriptControlandoCamara = false
+
 	
 	local States = {
 		Off = "rbxassetid://70491444431002",
@@ -201,40 +205,107 @@ do
 	-- ================================================================================
 	-- ✨ MODIFICACIÓN 2: Notificación para preguntar al jugador
 	-- ================================================================================
-	task.wait(1) -- Pequeña espera para que la GUI cargue
-	
+
 	local function notificationCallback(buttonText)
-		-- Dentro de la función notificationCallback
-if buttonText == "Sí" then
-    -- El jugador eligió desactivar la cámara forzada y el ShiftLock
-    forzarTerceraPersonaYShiftLock = false
-    ShiftLockButton.Visible = false -- Oculta el botón de ShiftLock
+	if buttonText == "Sí" then
+		forzarTerceraPersonaYShiftLock = false
+		modoPrimeraPersona = true
+		ShiftLockButton.Visible = false
 
-    -- ✨ Modo primera persona prioritario pero fluido ✨
-    player.CameraMode = Enum.CameraMode.LockFirstPerson
+		local player = game.Players.LocalPlayer
+		local camera = workspace.CurrentCamera
 
-    -- Permite que otros scripts cambien la cámara, pero recupera suavemente el control
-    task.spawn(function()
-        while task.wait(0.5) do
-            -- Si otro script cambia la cámara, esperamos un poco antes de recuperarla
-            if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
-                task.wait(1.5) -- pequeña espera para no pelear con otros scripts
-                if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
-                    -- transición suave
-                    local cam = workspace.CurrentCamera
-                    local targetCFrame = cam.CFrame
-                    for i = 1, 15 do
-                        cam.CFrame = cam.CFrame:Lerp(targetCFrame, i / 15)
-                        task.wait(0.02)
-                    end
-                    player.CameraMode = Enum.CameraMode.LockFirstPerson
-                end
-            end
-        end
-    end)
-end
-		-- Si el jugador presiona "No", no hacemos nada y todo sigue como antes
+		local enControlExterno = false
+		local tiempoInactividad = 1.5 -- segundos sin cambios para considerar que terminó
+		local hashPrevio = ""
+		local ultimoCambio = os.clock()
+
+		-- Función para aplicar primera persona completa
+		local function aplicarPrimeraPersonaTotal()
+			if not player or not camera then return end
+			player.CameraMode = Enum.CameraMode.LockFirstPerson
+			player.CameraMinZoomDistance = 0.5
+			player.CameraMaxZoomDistance = 0.5
+			camera.CameraType = Enum.CameraType.Custom
+			camera.FieldOfView = 70
+			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				camera.CameraSubject = humanoid
+			end
+		end
+
+		-- Función para generar un hash simple de la cámara
+		local function hashCam()
+			return tostring(camera.CameraType).."_"..
+				   tostring(camera.CameraSubject).."_"..
+				   tostring(player.CameraMode).."_"..
+				   tostring(camera.CFrame.Position)
+		end
+
+		-- Loop de monitoreo
+		task.spawn(function()
+			while modoPrimeraPersona do
+				task.wait(0.1)
+				local hashActual = hashCam()
+				if hashActual ~= hashPrevio then
+					ultimoCambio = os.clock()
+					hashPrevio = hashActual
+					enControlExterno = true -- detectamos que algo externo está moviendo la cámara
+				end
+
+				-- Si no hubo cambios por tiempoInactividad → cinemática externa terminó
+				if enControlExterno and (os.clock() - ultimoCambio > tiempoInactividad) then
+					enControlExterno = false
+					-- Restauramos primera persona
+					aplicarPrimeraPersonaTotal()
+					hashPrevio = hashCam() -- actualizar hash para no auto-detectarse
+				end
+
+				-- Si no hay control externo y no hay interferencia → asegurar primera persona
+				if not enControlExterno then
+					aplicarPrimeraPersonaTotal()
+				end
+			end
+		end)
+
+		-- Conectar reaparecer / respawn
+		local function onCharacter(character)
+			task.wait(0.5)
+			if not enControlExterno then
+				aplicarPrimeraPersonaTotal()
+			end
+
+			character.AncestryChanged:Connect(function(_, parent)
+				if parent and modoPrimeraPersona and not enControlExterno then
+					task.wait(0.5)
+					aplicarPrimeraPersonaTotal()
+				end
+			end)
+
+			local humanoid = character:WaitForChild("Humanoid", 5)
+			if humanoid then
+				humanoid.Died:Connect(function()
+					task.defer(function()
+						if modoPrimeraPersona and not enControlExterno then
+							task.wait(1)
+							aplicarPrimeraPersonaTotal()
+						end
+					end)
+				end)
+			end
+		end
+
+		if player.Character then
+			onCharacter(player.Character)
+		end
+		player.CharacterAdded:Connect(onCharacter)
+
+	else
+		-- Si el jugador elige "No", todo sigue normal
+		forzarTerceraPersonaYShiftLock = true
+		modoPrimeraPersona = false
 	end
+end
 
 	local bindableFunction = Instance.new("BindableFunction")
 	bindableFunction.OnInvoke = notificationCallback
@@ -527,17 +598,26 @@ end
 	-- ✨ MODIFICACIÓN 3: Se condiciona la ejecución de la cámara forzada
 	-- ================================================================================
 	task.spawn(function()
-		while task.wait(1) do
-			-- Solo se ejecuta si el jugador no eligió desactivarlo
-			if forzarTerceraPersonaYShiftLock then
-				for _, plr in ipairs(Players:GetPlayers()) do
-					if plr.CameraMode == Enum.CameraMode.LockFirstPerson then
-						forceThirdPerson(plr)
-					end
+	while task.wait(1) do
+		-- Si el jugador eligió mantener tercera persona, forzarla
+		if forzarTerceraPersonaYShiftLock then
+			for _, plr in ipairs(Players:GetPlayers()) do
+				if plr.CameraMode == Enum.CameraMode.LockFirstPerson then
+					forceThirdPerson(plr)
+				end
+			end
+		else
+			-- Si está en modo primera persona, aseguramos que siga así (solo si no hay otro script controlando)
+			if modoPrimeraPersona and not otroScriptControlandoCamara then
+				if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+					player.CameraMode = Enum.CameraMode.LockFirstPerson
+					player.CameraMinZoomDistance = 0.5
+					player.CameraMaxZoomDistance = 0.5
 				end
 			end
 		end
-	end)
+	end
+end)
 
 	Players.PlayerAdded:Connect(function(plr)
 		if forzarTerceraPersonaYShiftLock then
