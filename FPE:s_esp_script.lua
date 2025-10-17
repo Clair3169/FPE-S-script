@@ -177,7 +177,6 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 	-- ================================================================================
 	-- ✨ MODIFICACIÓN 1: Variable para controlar si la cámara forzada está activa
 	-- ================================================================================
-	local forzarTerceraPersonaYShiftLock = true
 	-- 🔸 NUEVAS VARIABLES DE CONTROL DE CÁMARA
     local modoPrimeraPersona = false
     local otroScriptControlandoCamara = false
@@ -322,25 +321,37 @@ end
 	end
 
 	ShiftLockButton.MouseButton1Click:Connect(function()
-		if not Active then
-			Active = RunService.RenderStepped:Connect(function()
-				if player.Character and player.Character:FindFirstChild("Humanoid") then
-					player.Character.Humanoid.AutoRotate = false
-					ShiftLockButton.Image = States.On
-					ShiftlockCursor.Visible = true
-					if frame and uiStroke.Thickness ~= 1.5 then
-						frame.Visible = false
-					end
-					if player.Character:FindFirstChild("HumanoidRootPart") then
-						player.Character.HumanoidRootPart.CFrame = CFrame.new(
-							player.Character.HumanoidRootPart.Position,
-							Vector3.new(
-								camera.CFrame.LookVector.X * MaxLength,
-								player.Character.HumanoidRootPart.Position.Y,
-								camera.CFrame.LookVector.Z * MaxLength
-							)
+	-- PROTECCIÓN: si el jugador eligió "Sí" (modo predeterminado), no hacemos nada
+	if modoPredeterminado then return end
+
+	-- OPCIONAL (buena práctica): si por algún motivo ya existe Active, desconéctalo antes
+	-- para evitar múltiples conexiones (fugas / comportamientos duplicados)
+	if Active then
+		pcall(function() Active:Disconnect() end)
+		Active = nil
+	end
+
+	if not Active then
+		Active = RunService.RenderStepped:Connect(function()
+			if player.Character and player.Character:FindFirstChild("Humanoid") then
+				player.Character.Humanoid.AutoRotate = false
+				ShiftLockButton.Image = States.On
+				ShiftlockCursor.Visible = true
+				if frame and uiStroke and uiStroke.Thickness ~= 1.5 then
+					frame.Visible = false
+				end
+				if player.Character:FindFirstChild("HumanoidRootPart") then
+					player.Character.HumanoidRootPart.CFrame = CFrame.new(
+						player.Character.HumanoidRootPart.Position,
+						Vector3.new(
+							camera.CFrame.LookVector.X * MaxLength,
+							player.Character.HumanoidRootPart.Position.Y,
+							camera.CFrame.LookVector.Z * MaxLength
 						)
-					end
+					)
+				end
+				-- Solo modificar cámara si está permitido por la flag global
+				if forzarTerceraPersonaYShiftLock then
 					camera.CFrame = camera.CFrame * EnabledOffset
 					camera.Focus = CFrame.fromMatrix(
 						camera.Focus.Position,
@@ -348,23 +359,28 @@ end
 						camera.CFrame.UpVector
 					) * EnabledOffset
 				end
-			end)
-		else
-			if player.Character and player.Character:FindFirstChild("Humanoid") then
-				player.Character.Humanoid.AutoRotate = true
 			end
-			ShiftLockButton.Image = States.Off
-			camera.CFrame = camera.CFrame * DisabledOffset
-			ShiftlockCursor.Visible = false
-			if frame and uiStroke.Thickness ~= 1.5 then
-				frame.Visible = true
-			end
-			pcall(function()
-				Active:Disconnect()
-				Active = nil
-			end)
+		end)
+	else
+		-- Si ya estaba activo, lo limpiamos
+		if player.Character and player.Character:FindFirstChild("Humanoid") then
+			player.Character.Humanoid.AutoRotate = true
 		end
-	end)
+		ShiftLockButton.Image = States.Off
+		-- Solo tocar la cámara si estábamos forzando (por seguridad)
+		if forzarTerceraPersonaYShiftLock then
+			camera.CFrame = camera.CFrame * DisabledOffset
+		end
+		ShiftlockCursor.Visible = false
+		if frame and uiStroke and uiStroke.Thickness ~= 1.5 then
+			frame.Visible = true
+		end
+		pcall(function()
+			if Active then Active:Disconnect() end
+			Active = nil
+		end)
+	end
+end)
 
 	local function ShiftLock() end
 	ContextActionService:BindAction("Shift Lock", ShiftLock, false, "On")
@@ -528,42 +544,22 @@ end
 	-- ================================================================================
 	task.spawn(function()
 	while task.wait(1) do
-		if camaraEsperandoRespuesta then continue end -- Espera la respuesta antes de tocar cámara
-
+		if camaraEsperandoRespuesta then continue end
 		if forzarTerceraPersonaYShiftLock then
-			for _, plr in ipairs(Players:GetPlayers()) do
-				if plr.CameraMode ~= Enum.CameraMode.Classic then
-					forceThirdPerson(plr)
-				end
-			end
-		else
-			-- ✅ Modo libre: no tocar la cámara, queda como la configuración predeterminada del juego
+			forceThirdPerson(player)
 		end
 	end
 end)
 
-
 	
-	Players.PlayerAdded:Connect(function(plr)
-	plr.CharacterAdded:Connect(function()
-		task.wait(0.5)
-		if not modoPredeterminado then
-			ShiftLockButton.Visible = false			
-			forceThirdPerson(plr)
-		end
-	end)
-end)
-
-	
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if forzarTerceraPersonaYShiftLock then
-			forceThirdPerson(plr)
-			plr.CharacterAdded:Connect(function()
-				task.wait(0.5)
-				forceThirdPerson(plr)
-			end)
-		end
+	player.CharacterAdded:Connect(function(character)
+	task.wait(0.5)
+	if modoPredeterminado then
+		ShiftLockButton.Visible = false
+	else
+		forceThirdPerson(player)
 	end
+end)
 
 	local area = Workspace:WaitForChild("Area")
 	local map = area:WaitForChild("Map")
