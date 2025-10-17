@@ -230,8 +230,8 @@ end
 	bindableFunction.OnInvoke = notificationCallback
 
 	game:GetService("StarterGui"):SetCore("SendNotification", {
-		Title = "Do you want to activate third person mode? :P";
-		Text = "Change is permanently in play.";
+		Title = "HEY!";
+		Text = "Do you want to activate third person mode?";
 		Icon = ""; -- Sin ícono
 		Duration = 15; -- Duración en segundos
 		Callback = bindableFunction; -- La función que se ejecuta al presionar un botón
