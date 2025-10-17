@@ -217,12 +217,10 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 		forzarTerceraPersonaYShiftLock = false
 		modoPredeterminado = true
 		ShiftLockButton.Visible = false -- 👈 se mantiene oculto siempre
-		print("[Cámara] Modo predeterminado activado. No se tocará la cámara.")
 	else
 		forzarTerceraPersonaYShiftLock = true
 		modoPredeterminado = false
 		ShiftLockButton.Visible = true -- 👈 solo se muestra si elige “No”
-		print("[Cámara] Tercera persona forzada activada.")
 	end
 
 	camaraEsperandoRespuesta = false
@@ -232,13 +230,13 @@ end
 	bindableFunction.OnInvoke = notificationCallback
 
 	game:GetService("StarterGui"):SetCore("SendNotification", {
-		Title = "Configuración de Cámara";
-		Text = "¿Deseas desactivar la 3ra persona forzada y el botón de ShiftLock?";
+		Title = "Do you want to activate third person mode? :P";
+		Text = "Change is permanently in play.";
 		Icon = ""; -- Sin ícono
 		Duration = 15; -- Duración en segundos
 		Callback = bindableFunction; -- La función que se ejecuta al presionar un botón
-		Button1 = "Sí";
-		Button2 = "No";
+		Button1 = "YES!!";
+		Button2 = "Nha";
 	})
 	
 	ShiftlockCursor.Name = "ShiftlockCursor"
