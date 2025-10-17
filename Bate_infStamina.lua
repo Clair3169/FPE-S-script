@@ -1,5 +1,5 @@
 -- ======================================================
--- 🟢 BOOST DE ATRIBUTOS CON "BAT"
+-- 🟢 BOOST DE ATRIBUTOS DE "BAT"
 -- ======================================================
 
 repeat task.wait() until game:IsLoaded()
@@ -18,8 +18,8 @@ end
 -- Configuración de valores
 local DEFAULT_MAX = 100
 local DEFAULT_STAMINA = 100
-local BOOST_MAX = 2000
-local BOOST_STAMINA = 2000
+local BOOST_MAX = 5000
+local BOOST_STAMINA = 5000
 
 -- Función para obtener el modelo del jugador dentro de Workspace.Students
 local function getStudentCharacter()
