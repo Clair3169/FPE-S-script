@@ -19,4 +19,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- AimBot #7
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/AimBot.lua", true))()
 
+-- Inf Stamina Bat #8
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Bate_infStamina.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
