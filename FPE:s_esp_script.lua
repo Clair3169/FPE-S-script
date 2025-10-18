@@ -233,7 +233,7 @@ end
 		Title = "Hey you!";
 		Text = "Do you want to activate third person mode?";
 		Icon = "rbxassetid://97207642508375";
-		Duration = 15; -- Duración en segundos
+		Duration = 20; -- Duración en segundos
 		Callback = bindableFunction; -- La función que se ejecuta al presionar un botón
 		Button1 = "Nha";
 		Button2 = "Yess!!";
