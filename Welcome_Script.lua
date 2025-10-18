@@ -1,6 +1,8 @@
 -- ======================================================
 -- 💬 Random Dialogue Once (Espacio ultra reducido)
 -- ======================================================
+task.wait(5)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -15,8 +17,6 @@ local dialogues = {
 	"Hi",
 	"this programming thing is veeeery difficult..."
 }
-
-task.wait(5)
 
 -- GUI principal
 local ScreenGui = Instance.new("ScreenGui")
