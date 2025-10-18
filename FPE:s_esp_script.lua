@@ -232,7 +232,7 @@ end
 	game:GetService("StarterGui"):SetCore("SendNotification", {
 		Title = "Hey you!";
 		Text = "Do you want to activate third person mode?";
-		Icon = "97207642508375"; -- Sin ícono
+		Icon = "97207642508375";
 		Duration = 15; -- Duración en segundos
 		Callback = bindableFunction; -- La función que se ejecuta al presionar un botón
 		Button1 = "Nha";
