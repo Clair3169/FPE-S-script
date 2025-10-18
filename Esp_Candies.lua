@@ -1,11 +1,10 @@
 -- ======================================================
 -- 🍬 Candy Billboard Dynamic (sin brillo + con filtro de carpetas)
--- Ultra optimizado, sin bucles ni parpadeos
+-- Ultra optimizado: Throttle + Cache + MagnitudeSqr
 -- ======================================================
 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 local CandiesFolder = Workspace:WaitForChild("Candies")
 local Player = Players.LocalPlayer
@@ -18,12 +17,13 @@ local Settings = {
 	BillboardSize = UDim2.new(0, 16, 0, 16),
 	BillboardOffset = Vector3.new(0, 2.5, 0),
 	CircleColor = Color3.fromRGB(255, 140, 0),
-	AllowedFolder = "Students", -- solo se aplica si el jugador está dentro o fuera de esta carpeta
+	AllowedFolder = "Students", -- (no usado activamente, conservado)
 	BlockedFolders = {"Alices", "Teachers"}, -- no aplicar si está dentro de estas carpetas
+	UpdateRate = 0.1,           -- segundos entre actualizaciones (10 veces/seg)
 }
 
 -- ==============================
--- 🧩 Detectar carpeta actual del jugador
+-- 🧩 Detectar carpeta actual del jugador (función original)
 -- ==============================
 local function getParentFolderName()
 	local char = Player.Character
@@ -37,7 +37,41 @@ local function getParentFolderName()
 end
 
 -- ==============================
--- 🌀 Crear Billboard sobre un Candy
+-- 🔒 Cache del estado de bloqueo (optimización 2)
+-- ==============================
+local isBlocked = false
+
+local function updateBlockedState()
+	local parentFolder = getParentFolderName()
+	isBlocked = false
+	for _, name in ipairs(Settings.BlockedFolders) do
+		if parentFolder == name then
+			isBlocked = true
+			break
+		end
+	end
+end
+
+-- Actualizar cuando el personaje aparece / cambia de ancestro
+Player.CharacterAdded:Connect(function(char)
+	-- actualizar inmediatamente al aparecer
+	updateBlockedState()
+
+	-- si el personaje cambia de padre (se movió a otra carpeta), actualizar cache
+	char.AncestorChanged:Connect(function(child, parent)
+		if child == char then
+			updateBlockedState()
+		end
+	end)
+end)
+
+-- Estado inicial (si el Character ya existe)
+if Player.Character then
+	updateBlockedState()
+end
+
+-- ==============================
+-- 🌀 Crear Billboard sobre un Candy (sin cambios funcionales)
 -- ==============================
 local function createBillboard(candy)
 	if candy:FindFirstChild("CandyBillboard") then
@@ -73,7 +107,7 @@ local function createBillboard(candy)
 end
 
 -- ==============================
--- 📦 Manejo de Candies
+-- 📦 Manejo de Candies (sin cambios funcionales)
 -- ==============================
 local allCandies = {}
 local allBillboards = {}
@@ -107,6 +141,7 @@ end)
 
 -- ==============================
 -- 🔍 Obtener los 7 Candies más cercanos al jugador
+-- (optimización 3: usar MagnitudeSqr en vez de Magnitude)
 -- ==============================
 local function getClosestCandies()
 	local character = Player.Character
@@ -117,7 +152,8 @@ local function getClosestCandies()
 
 	for _, candy in ipairs(allCandies) do
 		if candy and candy:IsDescendantOf(Workspace) then
-			local dist = (candy.Position - pos).Magnitude
+			-- <<< CAMBIO: use MagnitudeSqr (más rápido) >>>
+			local dist = (candy.Position - pos).MagnitudeSqr
 			table.insert(distances, {candy = candy, dist = dist})
 		end
 	end
@@ -135,38 +171,42 @@ local function getClosestCandies()
 end
 
 -- ==============================
--- 🚦 Control principal (RenderStepped)
+-- 🚦 Control principal (Throttle en lugar de RenderStepped)
+-- (optimización 1: actualiza solo Settings.UpdateRate veces/seg)
 -- ==============================
-RunService.RenderStepped:Connect(function()
-	if #allCandies == 0 then return end
+task.spawn(function()
+	while true do
+		task.wait(Settings.UpdateRate)
 
-	local parentFolder = getParentFolderName()
-	local isBlocked = false
-	for _, name in ipairs(Settings.BlockedFolders) do
-		if parentFolder == name then
-			isBlocked = true
-			break
-		end
-	end
+		if #allCandies == 0 then
+			-- nada que hacer si no hay candies
+		else
+			-- usar el estado cacheado isBlocked (actualizado solo cuando corresponde)
+			if isBlocked then
+				-- Desactivar todos los billboards si está en una carpeta bloqueada
+				for _, bb in pairs(allBillboards) do
+					if bb and bb.Enabled then
+						bb.Enabled = false
+					end
+				end
+			else
+				-- Mostrar solo los 7 más cercanos si no está bloqueado
+				local closest = getClosestCandies()
+				local visibleSet = {}
+				for _, c in ipairs(closest) do
+					visibleSet[c] = true
+				end
 
-	if isBlocked then
-		-- Desactivar todos los billboards si está en una carpeta bloqueada
-		for _, bb in pairs(allBillboards) do
-			if bb then bb.Enabled = false end
-		end
-		return
-	end
-
-	-- Mostrar solo los 7 más cercanos si no está en carpeta bloqueada
-	local closest = getClosestCandies()
-	local visibleSet = {}
-	for _, c in ipairs(closest) do
-		visibleSet[c] = true
-	end
-
-	for candy, bb in pairs(allBillboards) do
-		if bb and bb.Parent then
-			bb.Enabled = visibleSet[candy] or false
+				for candy, bb in pairs(allBillboards) do
+					if bb and bb.Parent then
+						local shouldBe = visibleSet[candy] or false
+						-- Micro-opt: solo escribir si cambia
+						if bb.Enabled ~= shouldBe then
+							bb.Enabled = shouldBe
+						end
+					end
+				end
+			end
 		end
 	end
 end)
