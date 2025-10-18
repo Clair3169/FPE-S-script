@@ -8,13 +8,13 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local dialogues = {
-	"Today feels like a strange day...",
-	"Something tells me this place hides a secret.",
-	"I swear I saw something move over there...",
-	"Maybe I should’ve stayed home today.",
-	"I can’t shake off this weird feeling...",
-	"I’ve got a bad feeling about this...",
-	"Looks quiet... maybe too quiet."
+	"Welcome.",
+	"HAPPY HALLOWEEN!!",
+	"This script works more for mobile than for PC",
+	"Did you read that this is in beta?",
+	"Hi how are things? everything okay Bro?",
+	"Hi",
+	"this programming thing is veeeery difficult..."
 }
 
 -- GUI principal
