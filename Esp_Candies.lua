@@ -1,13 +1,12 @@
 -- ======================================================
--- 🍬 Candy Billboard Dynamic (7 más cercanos al jugador)
--- Sin bucles infinitos, ultra eficiente
+-- 🍬 Candy Billboard Dynamic (sin brillo + con filtro de carpetas)
+-- Ultra optimizado, sin bucles ni parpadeos
 -- ======================================================
 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
--- Carpeta Candies
 local CandiesFolder = Workspace:WaitForChild("Candies")
 local Player = Players.LocalPlayer
 
@@ -15,14 +14,27 @@ local Player = Players.LocalPlayer
 -- ⚙️ CONFIGURACIÓN
 -- ==============================
 local Settings = {
-	MaxVisibleBillboards = 7,   -- máximo de billboards visibles
+	MaxVisibleBillboards = 7,   -- máximo de Candies visibles
 	BillboardSize = UDim2.new(0, 16, 0, 16),
 	BillboardOffset = Vector3.new(0, 2.5, 0),
 	CircleColor = Color3.fromRGB(255, 140, 0),
-	TransMin = 0.15,
-	TransMax = 0.4,
-	PulseSpeed = 1.5,           -- velocidad del brillo
+	AllowedFolder = "Students", -- solo se aplica si el jugador está dentro o fuera de esta carpeta
+	BlockedFolders = {"Alices", "Teachers"}, -- no aplicar si está dentro de estas carpetas
 }
+
+-- ==============================
+-- 🧩 Detectar carpeta actual del jugador
+-- ==============================
+local function getParentFolderName()
+	local char = Player.Character
+	if not char then return nil end
+
+	local parent = char.Parent
+	if parent and parent:IsA("Folder") then
+		return parent.Name
+	end
+	return nil
+end
 
 -- ==============================
 -- 🌀 Crear Billboard sobre un Candy
@@ -49,7 +61,7 @@ local function createBillboard(candy)
 	circle.Position = UDim2.new(0.5, 0, 0.5, 0)
 	circle.AnchorPoint = Vector2.new(0.5, 0.5)
 	circle.BackgroundColor3 = Settings.CircleColor
-	circle.BackgroundTransparency = Settings.TransMin
+	circle.BackgroundTransparency = 0.2
 	circle.BorderSizePixel = 0
 	circle.Parent = billboard
 
@@ -123,16 +135,29 @@ local function getClosestCandies()
 end
 
 -- ==============================
--- ✨ Animación + actualización por frame
+-- 🚦 Control principal (RenderStepped)
 -- ==============================
-local start = tick()
 RunService.RenderStepped:Connect(function()
 	if #allCandies == 0 then return end
 
-	local t = tick() - start
-	local pulse = (math.sin(t * Settings.PulseSpeed * math.pi * 2) + 1) / 2
-	local transparency = Settings.TransMin + pulse * (Settings.TransMax - Settings.TransMin)
+	local parentFolder = getParentFolderName()
+	local isBlocked = false
+	for _, name in ipairs(Settings.BlockedFolders) do
+		if parentFolder == name then
+			isBlocked = true
+			break
+		end
+	end
 
+	if isBlocked then
+		-- Desactivar todos los billboards si está en una carpeta bloqueada
+		for _, bb in pairs(allBillboards) do
+			if bb then bb.Enabled = false end
+		end
+		return
+	end
+
+	-- Mostrar solo los 7 más cercanos si no está en carpeta bloqueada
 	local closest = getClosestCandies()
 	local visibleSet = {}
 	for _, c in ipairs(closest) do
@@ -142,10 +167,6 @@ RunService.RenderStepped:Connect(function()
 	for candy, bb in pairs(allBillboards) do
 		if bb and bb.Parent then
 			bb.Enabled = visibleSet[candy] or false
-			local circle = bb:FindFirstChild("Circle")
-			if circle and bb.Enabled then
-				circle.BackgroundTransparency = transparency
-			end
 		end
 	end
 end)
