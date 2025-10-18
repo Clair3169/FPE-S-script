@@ -1,8 +1,6 @@
 -- ======================================================
 -- 💬 Random Dialogue Once (Espacio ultra reducido)
 -- ======================================================
-task.wait(5)
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
