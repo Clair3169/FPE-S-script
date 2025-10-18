@@ -1,7 +1,6 @@
 -- ======================================================
 -- 💬 Random Dialogue Once (Espacio ultra reducido)
 -- ======================================================
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -66,6 +65,9 @@ local rotAmplitude = 8
 local speed = 2.2
 
 local connection
+
+task.wait(5)
+
 connection = RunService.RenderStepped:Connect(function()
 	local t = tick() - startTime
 	local offsetX = math.sin(t * speed) * amplitudeX
