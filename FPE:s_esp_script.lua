@@ -311,20 +311,23 @@ end
 	end
 
 	local function processCharacter(model)
-		if not model or not model:IsA("Model") then return end
-		local teacherName = model:GetAttribute("TeacherName")
-		if not teacherName then return end
-		local imageId = teacherImages[teacherName]
-		if imageId then
-			local headPart = findRealHead(model)
-			if headPart then
-				createFloatingImage(headPart, imageId)
-				if teacherName == "Circle" then
-					monitorEnraged(model)
-				end
+	-- 🚫 Si el jugador está en Teachers o Alices, no crear BillboardGui
+	if isLocalInFolders() then return end
+
+	if not model or not model:IsA("Model") then return end
+	local teacherName = model:GetAttribute("TeacherName")
+	if not teacherName then return end
+	local imageId = teacherImages[teacherName]
+	if imageId then
+		local headPart = findRealHead(model)
+		if headPart then
+			createFloatingImage(headPart, imageId)
+			if teacherName == "Circle" then
+				monitorEnraged(model)
 			end
 		end
 	end
+end
 
 	local function isLocalInFolders()
 		return TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name)
@@ -340,15 +343,6 @@ end
 			processCharacter(a)
 		end
 	end
-
--- 🚫 Si el jugador está en Teachers o Alices, desactiva sus TeacherBillboard
-if isLocalInFolders() then
-	for _, bb in ipairs(Workspace:GetDescendants()) do
-		if bb:IsA("BillboardGui") and bb.Name == "TeacherBillboard" then
-			bb.Enabled = false
-		end
-	end
-end
 
 	TeachersFolder.ChildAdded:Connect(function(child)
 		task.wait(1)
