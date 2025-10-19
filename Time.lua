@@ -44,8 +44,6 @@ end
 -- Esperar hasta que los sonidos tengan duración
 repeat task.wait() until quietHalls.TimeLength > 0 and properBehavior.TimeLength > 0
 
-print("[Temporizador activo]")
-print("QuietHalls:", quietHalls.TimeLength, "ProperBehavior:", properBehavior.TimeLength)
 
 -- Comprobar si el jugador está en Alices o Teachers
 local function isInExcludedFolder()
