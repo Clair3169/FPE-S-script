@@ -49,8 +49,8 @@ local function applyBoost(model)
 
 	-- Usamos un solo SetAttribute. Si el atributo no existe, esto lo creará.
 	-- Si tu juego REQUIERE que el atributo exista, vuelve a tu método con GetAttribute
-	model:SetAttribute("Stamina", 5000)
-	model:SetAttribute("MaxStamina", 5000)
+	model:SetAttribute("Stamina", 1000)
+	model:SetAttribute("MaxStamina", 1000)
 end
 
 -- === OPTIMIZACIÓN 2: Lógica Principal Unificada ===
