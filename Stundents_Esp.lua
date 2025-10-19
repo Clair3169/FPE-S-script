@@ -39,7 +39,7 @@ RunService.RenderStepped:Connect(function()
 		end
 		local distance = (camPos - head.Position).Magnitude
 		-- Aumenta el límite máximo para que crezca más con la distancia
-        local scale = math.clamp(distance / 30, 0.6, 7.5)
+        local scale = math.clamp(distance / 30, 0.6, 3.5)
         billboard.Size = UDim2.new(scale * 3, 0, scale * 3, 0)
 	end
 end)
