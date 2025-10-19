@@ -1,7 +1,6 @@
 ------------------------------------------------------------------------------------
 -- 🅱️ BLOQUE B — HELLA MODE REMAKE + FLOATING IMAGES + CÁMARA + SHIFTLOCK + SPRINT
 ------------------------------------------------------------------------------------
-do
 	-- 🔧 Control del modo de cámara
 local camaraEsperandoRespuesta = true
 local forzarTerceraPersonaYShiftLock = true
@@ -342,6 +341,15 @@ end
 		end
 	end
 
+-- 🚫 Si el jugador está en Teachers o Alices, desactiva sus TeacherBillboard
+if isLocalInFolders() then
+	for _, bb in ipairs(Workspace:GetDescendants()) do
+		if bb:IsA("BillboardGui") and bb.Name == "TeacherBillboard" then
+			bb.Enabled = false
+		end
+	end
+end
+
 	TeachersFolder.ChildAdded:Connect(function(child)
 		task.wait(1)
 		if not isLocalInFolders() or child.Name ~= player.Name then
@@ -492,4 +500,3 @@ end)
 			end
 		end)
 	end)
-end
