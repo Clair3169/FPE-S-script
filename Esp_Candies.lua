@@ -1,6 +1,6 @@
 -- ======================================================
 -- 🍬 Candy Billboard Dynamic (sin brillo + con filtro de carpetas)
--- ⚡ Versión final: Throttle + Cache + DotDistance + sin comprobación forzada
+-- ⚡ Versión final: Throttle + Cache + DotDistance + Filtro de Distancia
 -- ======================================================
 
 local Workspace = game:GetService("Workspace")
@@ -14,11 +14,12 @@ local Player = Players.LocalPlayer
 -- ==============================
 local Settings = {
 	MaxVisibleBillboards = 7,   -- máximo de Candies visibles
+	MaxRenderDistance = 100,     -- 🆕 ¡NUEVO! Distancia máxima de renderizado (en studs)
 	BillboardSize = UDim2.new(0, 16, 0, 16),
 	BillboardOffset = Vector3.new(0, 2.5, 0),
 	CircleColor = Color3.fromRGB(255, 140, 0),
 	BlockedFolders = {"Alices", "Teachers"}, -- carpetas bloqueadas
-	UpdateRate = 0.1,           -- segundos entre actualizaciones (10 veces/seg)
+	UpdateRate = 0.1,          -- segundos entre actualizaciones (10 veces/seg)
 }
 
 -- ==============================
@@ -77,6 +78,7 @@ local function createBillboard(candy)
 	billboard.Size = Settings.BillboardSize
 	billboard.LightInfluence = 0
 	billboard.StudsOffset = Settings.BillboardOffset
+	billboard.MaxDistance = Settings.MaxRenderDistance
 
 	local adornee = candy:FindFirstChildWhichIsA("BasePart") or candy
 	billboard.Adornee = adornee
@@ -133,7 +135,7 @@ CandiesFolder.ChildRemoved:Connect(function(child)
 end)
 
 -- ==============================
--- 🔍 Obtener los 7 Candies más cercanos (usa Dot para velocidad)
+-- 🔍 Obtener los 7 Candies más cercanos (¡OPTIMIZADO!)
 -- ==============================
 local function getClosestCandies()
 	local character = Player.Character
@@ -144,11 +146,15 @@ local function getClosestCandies()
 	local pos = character.HumanoidRootPart.Position
 	local distances = {}
 
+	local maxDistSq = Settings.MaxRenderDistance * Settings.MaxRenderDistance
+
 	for _, candy in ipairs(allCandies) do
 		if candy and candy:IsDescendantOf(Workspace) then
 			local diff = candy.Position - pos
 			local dist = diff:Dot(diff)
-			table.insert(distances, {candy = candy, dist = dist})
+			if dist < maxDistSq then
+				table.insert(distances, {candy = candy, dist = dist})
+			end
 		end
 	end
 
@@ -176,14 +182,12 @@ task.spawn(function()
 		end
 
 		if isBlocked then
-			-- Desactivar todos los billboards
 			for _, bb in pairs(allBillboards) do
 				if bb and bb.Enabled then
 					bb.Enabled = false
 				end
 			end
 		else
-			-- Mostrar solo los 7 más cercanos
 			local closest = getClosestCandies()
 			local visibleSet = {}
 			for _, c in ipairs(closest) do
