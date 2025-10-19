@@ -15,17 +15,16 @@ local VALID_FOLDERS = { "Alices", "Teachers" }
 
 -- 🖼️ Configuración
 local IMAGE_ID = "rbxassetid://126500139798475"
-local MAX_VISIBLE = 10
+local MAX_VISIBLE = 7 -- Puedes subir esto a 25 con más seguridad ahora
 
 -- ⚙️ Estado
 local systemActive = false
 local activeBillboards = {}
-local visibleStudents = {} -- Solo los 10 más cercanos
+local visibleStudents = {}
 local currentCamera = Workspace.CurrentCamera
 
 ------------------------------------------------------------
 -- 🎥 RenderStepped (escala dinámica, ultra liviano)
--- (Esta parte está perfecta, no se toca)
 ------------------------------------------------------------
 RunService.RenderStepped:Connect(function()
 	if not systemActive or not next(activeBillboards) then return end
@@ -38,15 +37,13 @@ RunService.RenderStepped:Connect(function()
 			continue
 		end
 		local distance = (camPos - head.Position).Magnitude
-		-- Aumenta el límite máximo para que crezca más con la distancia
-        local scale = math.clamp(distance / 30, 0.6, 3.5)
-        billboard.Size = UDim2.new(scale * 3, 0, scale * 3, 0)
+		local scale = math.clamp(distance / 30, 0.6, 3.5)
+		billboard.Size = UDim2.new(scale * 3, 0, scale * 3, 0)
 	end
 end)
 
 ------------------------------------------------------------
 -- 🧩 Crear / Destruir Billboard
--- (Esta parte está perfecta, no se toca)
 ------------------------------------------------------------
 local function createFloatingImage(character)
 	if not character or not character:IsA("Model") then return end
@@ -85,7 +82,6 @@ end
 
 ------------------------------------------------------------
 -- 🧩 Visibilidad de los 10 más cercanos
--- (Esta función es "cara", así que solo la llamaremos cuando sea necesario)
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
@@ -94,38 +90,36 @@ local function updateVisibleStudents()
 	if not localHead then return end
 	
 	local localPos = localHead.Position
+	local MAX_STUD_DISTANCE = 95
 
-	-- Recolectar distancias
 	local distances = {}
 	for _, student in ipairs(studentsFolder:GetChildren()) do
 		if student ~= localPlayer.Character and student:IsA("Model") then
 			local head = student:FindFirstChild("Head")
 			if head then
 				local dist = (localPos - head.Position).Magnitude
-				table.insert(distances, {student, dist})
+				if dist < MAX_STUD_DISTANCE then
+					table.insert(distances, {student, dist})
+				end
 			end
 		end
 	end
 
-	-- Ordenar por distancia (Esta es la parte "cara")
 	table.sort(distances, function(a, b)
 		return a[2] < b[2]
 	end)
 
-	-- Elegir los 10 más cercanos
 	local newVisible = {}
 	for i = 1, math.min(MAX_VISIBLE, #distances) do
 		newVisible[distances[i][1]] = true
 	end
 
-	-- Aplicar cambios: Ocultar los que ya no están
 	for student, _ in pairs(visibleStudents) do
 		if not newVisible[student] then
 			destroyFloatingImage(student)
 		end
 	end
 	
-	-- Aplicar cambios: Mostrar los nuevos
 	for student, _ in pairs(newVisible) do
 		if not visibleStudents[student] then
 			createFloatingImage(student)
@@ -157,8 +151,6 @@ local function updateSystemStatus(force)
 	if systemActive then
 		updateVisibleStudents()
 	else
-		-- === CORRECCIÓN DEL BUG ===
-		-- Iteramos sobre las LLAVES (student), no los valores (true)
 		for student, _ in pairs(visibleStudents) do
 			destroyFloatingImage(student)
 		end
@@ -167,7 +159,7 @@ local function updateSystemStatus(force)
 end
 
 ------------------------------------------------------------
--- 🧠 Monitor de Students (Perfecto)
+-- 🧠 Monitor de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if systemActive and child ~= localPlayer.Character then
@@ -176,23 +168,13 @@ studentsFolder.ChildAdded:Connect(function(child)
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
-	-- No es necesario revisar si 'systemActive' aquí.
-	-- Si un jugador se va, DEBE ser procesado para
-	-- eliminarlo de 'visibleStudents' si estaba allí.
 	if visibleStudents[child] then
 		visibleStudents[child] = nil
-		-- 'destroyFloatingImage' ya se encarga de limpiarlo
-		-- de 'activeBillboards', pero la lista principal
-		-- 'visibleStudents' también debe limpiarse.
 	end
-	
-	-- Si un jugador que no era visible se va, no pasa nada.
-	-- Si un jugador visible se va, deja un espacio
-	-- que el bucle de "movimiento" (abajo) llenará.
 end)
 
 ------------------------------------------------------------
--- 🧩 Control de tu personaje (Perfecto)
+-- 🧩 Control de tu personaje
 ------------------------------------------------------------
 local function onCharacterAdded(character)
 	updateSystemStatus(true)
@@ -205,24 +187,18 @@ end
 localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
 ------------------------------------------------------------
--- ♻️ OPTIMIZACIÓN: Actualización inteligente (no cada 0.5s)
+-- ♻️ OPTIMIZACIÓN: Actualización inteligente
 ------------------------------------------------------------
 task.spawn(function()
 	local lastPlayerPosition = Vector3.zero
-	-- Usamos un 'heartbeat' (latido) que es más eficiente que task.wait
 	while RunService.Heartbeat:Wait() do
-		
 		if not systemActive or not localPlayer.Character then continue end
-		
 		local head = localPlayer.Character:FindFirstChild("Head")
 		if not head then continue end
-		
 		local currentPos = head.Position
-		
-		-- Solo recalcula la lista si el jugador se movió más de 5 studs
 		if (currentPos - lastPlayerPosition).Magnitude > 5 then
 			lastPlayerPosition = currentPos
-			updateVisibleStudents() -- ¡Llama a la función "cara" solo ahora!
+			updateVisibleStudents()
 		end
 	end
 end)
