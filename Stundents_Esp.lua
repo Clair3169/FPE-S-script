@@ -90,7 +90,7 @@ local function updateVisibleStudents()
 	if not localHead then return end
 	
 	local localPos = localHead.Position
-	local MAX_STUD_DISTANCE = 95
+	local MAX_STUD_DISTANCE = 150
 
 	local distances = {}
 	for _, student in ipairs(studentsFolder:GetChildren()) do
