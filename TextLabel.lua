@@ -28,5 +28,5 @@ local function createLabel(text, color, position)
 end
 
 -- Crear las dos etiquetas con tus posiciones exactas
-local greenLabel = createLabel("Ctrl = InfStamina", Color3.fromRGB(0, 255, 0), UDim2.new(0, 5, 1, -15))
+local greenLabel = createLabel("", Color3.fromRGB(0, 255, 0), UDim2.new(0, 5, 1, -15))
 local redLabel = createLabel("Script in beta", Color3.fromRGB(255, 0, 0), UDim2.new(0, 5, 1, 0))
