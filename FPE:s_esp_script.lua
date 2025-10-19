@@ -1,10 +1,10 @@
 ------------------------------------------------------------------------------------
 -- 🅱️ BLOQUE B — HELLA MODE REMAKE + FLOATING IMAGES + CÁMARA + SHIFTLOCK + SPRINT
 ------------------------------------------------------------------------------------
-	-- 🔧 Control del modo de cámara
-local camaraEsperandoRespuesta = true
-local forzarTerceraPersonaYShiftLock = true
-local modoPredeterminado = false -- se activa si el jugador elige "Sí"
+-- 🔧 Control del modo de cámara
+	local camaraEsperandoRespuesta = true
+	local forzarTerceraPersonaYShiftLock = true
+	local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 
 
 	local CoreGui = game:GetService("CoreGui")
@@ -26,8 +26,8 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 	-- ✨ MODIFICACIÓN 1: Variable para controlar si la cámara forzada está activa
 	-- ================================================================================
 	-- 🔸 NUEVAS VARIABLES DE CONTROL DE CÁMARA
-    local modoPrimeraPersona = false
-    local otroScriptControlandoCamara = false
+	local modoPrimeraPersona = false
+	local otroScriptControlandoCamara = false
 
 	
 	local States = {
@@ -61,18 +61,18 @@ local modoPredeterminado = false -- se activa si el jugador elige "Sí"
 	-- ================================================================================
 	
 	local function notificationCallback(buttonText)
-	if buttonText == "Nha" then
-		forzarTerceraPersonaYShiftLock = false
-		modoPredeterminado = true
-		ShiftLockButton.Visible = false -- 👈 se mantiene oculto siempre
-	else
-		forzarTerceraPersonaYShiftLock = true
-		modoPredeterminado = false
-		ShiftLockButton.Visible = true -- 👈 solo se muestra si elige “No”
-	end
+		if buttonText == "Nha" then
+			forzarTerceraPersonaYShiftLock = false
+			modoPredeterminado = true
+			ShiftLockButton.Visible = false -- 👈 se mantiene oculto siempre
+		else
+			forzarTerceraPersonaYShiftLock = true
+			modoPredeterminado = false
+			ShiftLockButton.Visible = true -- 👈 solo se muestra si elige “No”
+		end
 
-	camaraEsperandoRespuesta = false
-end
+		camaraEsperandoRespuesta = false
+	end
 
 	local bindableFunction = Instance.new("BindableFunction")
 	bindableFunction.OnInvoke = notificationCallback
@@ -310,64 +310,69 @@ end
 		model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
 	end
 
-	local function processCharacter(model)
-	-- 🚫 Si el jugador está en Teachers o Alices, no crear BillboardGui
-	if isLocalInFolders() then return end
-
-	if not model or not model:IsA("Model") then return end
-	local teacherName = model:GetAttribute("TeacherName")
-	if not teacherName then return end
-	local imageId = teacherImages[teacherName]
-	if imageId then
-		local headPart = findRealHead(model)
-		if headPart then
-			createFloatingImage(headPart, imageId)
-			if teacherName == "Circle" then
-				monitorEnraged(model)
-			end
-		end
-	end
-end
-
+	-- ✅ ESTA ES LA FUNCIÓN DE AYUDA (SE MANTIENE IGUAL)
 	local function isLocalInFolders()
 		return TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name)
 	end
 
-	for _, t in ipairs(TeachersFolder:GetChildren()) do
-		if not isLocalInFolders() or t.Name ~= player.Name then
-			processCharacter(t)
+	-- ❗️ AQUÍ ESTÁ LA CORRECCIÓN
+	local function processCharacter(model)
+		if not model or not model:IsA("Model") then return end
+		
+		-- Si el modelo que estamos procesando es el del jugador local
+		-- Y el jugador local SÍ está en las carpetas (es Teacher o Alice)
+		-- Entonces no hacemos nada.
+		if model.Name == player.Name and isLocalInFolders() then
+			return
+		end
+
+		-- Si no es el jugador local (o el jugador no es Teacher/Alice),
+		-- continuamos con la creación del billboard con normalidad.
+		local teacherName = model:GetAttribute("TeacherName")
+		if not teacherName then return end
+		local imageId = teacherImages[teacherName]
+		if imageId then
+			local headPart = findRealHead(model)
+			if headPart then
+				createFloatingImage(headPart, imageId)
+				if teacherName == "Circle" then
+					monitorEnraged(model)
+				end
+			end
 		end
 	end
+
+	-- ❗️ Y AQUÍ SE SIMPLIFICAN LAS LLAMADAS
+	-- Ahora simplemente llamamos a processCharacter.
+	-- La función misma se encargará de decidir si crea el billboard o no.
+	
+	for _, t in ipairs(TeachersFolder:GetChildren()) do
+		processCharacter(t)
+	end
 	for _, a in ipairs(AlicesFolder:GetChildren()) do
-		if not isLocalInFolders() or a.Name ~= player.Name then
-			processCharacter(a)
-		end
+		processCharacter(a)
 	end
 
 	TeachersFolder.ChildAdded:Connect(function(child)
 		task.wait(1)
-		if not isLocalInFolders() or child.Name ~= player.Name then
-			processCharacter(child)
-		end
+		processCharacter(child)
 	end)
 	AlicesFolder.ChildAdded:Connect(function(child)
 		task.wait(1)
-		if not isLocalInFolders() or child.Name ~= player.Name then
-			processCharacter(child)
-		end
+		processCharacter(child)
 	end)
 
 	-- 📸 Control seguro de cámara — se ejecuta solo cuando ya se respondió
-local MIN_ZOOM = 4
-local MAX_ZOOM = 100
+	local MIN_ZOOM = 4
+	local MAX_ZOOM = 100
 
-local function forceThirdPerson(plr)
-	if camaraEsperandoRespuesta then return end
-	if not forzarTerceraPersonaYShiftLock then return end -- 👈 No hacer nada si está en modo libre
-	plr.CameraMode = Enum.CameraMode.Classic
-	plr.CameraMinZoomDistance = MIN_ZOOM
-	plr.CameraMaxZoomDistance = MAX_ZOOM
-end
+	local function forceThirdPerson(plr)
+		if camaraEsperandoRespuesta then return end
+		if not forzarTerceraPersonaYShiftLock then return end -- 👈 No hacer nada si está en modo libre
+		plr.CameraMode = Enum.CameraMode.Classic
+		plr.CameraMinZoomDistance = MIN_ZOOM
+		plr.CameraMaxZoomDistance = MAX_ZOOM
+	end
 
 
 
@@ -376,23 +381,23 @@ end
 	-- ✨ MODIFICACIÓN 3: Se condiciona la ejecución de la cámara forzada
 	-- ================================================================================
 	task.spawn(function()
-	while task.wait(1) do
-		if camaraEsperandoRespuesta then continue end
-		if forzarTerceraPersonaYShiftLock then
-			forceThirdPerson(player)
+		while task.wait(1) do
+			if camaraEsperandoRespuesta then continue end
+			if forzarTerceraPersonaYShiftLock then
+				forceThirdPerson(player)
+			end
 		end
-	end
-end)
+	end)
 
 	
 	player.CharacterAdded:Connect(function(character)
-	task.wait(0.5)
-	if modoPredeterminado then
-		ShiftLockButton.Visible = false
-	else
-		forceThirdPerson(player)
-	end
-end)
+		task.wait(0.5)
+		if modoPredeterminado then
+			ShiftLockButton.Visible = false
+		else
+			forceThirdPerson(player)
+		end
+	end)
 
 	local area = Workspace:WaitForChild("Area")
 	local map = area:WaitForChild("Map")
