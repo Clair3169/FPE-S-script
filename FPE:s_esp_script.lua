@@ -252,38 +252,43 @@
 		return nil
 	end
 
-	-- 🔧 OPTIMIZACIÓN 1: 'createFloatingImage' modificada
-	-- Ya no crea una conexión a RenderStepped.
-	-- Ahora solo añade el billboard a la tabla 'activeBillboards'.
-	local function createFloatingImage(headPart, imageId)
-		if not headPart or not headPart:IsA("BasePart") then return end
-		if headPart:FindFirstChild("TeacherBillboard") then return end
 
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "TeacherBillboard"
+    -- 🔧 OPTIMIZACIÓN 1: 'createFloatingImage' modificada
+-- Añadida verificación para evitar creación si el jugador local está dentro de Teachers o Alices
+local function createFloatingImage(headPart, imageId)
+	if not headPart or not headPart:IsA("BasePart") then return end
+	if headPart:FindFirstChild("TeacherBillboard") then return end
 
-		local size = (imageId == teacherImages.AlicePhase2) and 6 or 4
-		billboard.Size = UDim2.new(size, 0, size, 0)
-		billboard.AlwaysOnTop = true
-		billboard.LightInfluence = 0
-		billboard.StudsOffset = Vector3.new(0, 2.7, 0)
-		billboard.Parent = headPart
-
-		local imageLabel = Instance.new("ImageLabel")
-		imageLabel.Name = "Icon"
-		imageLabel.Size = UDim2.new(1, 0, 1, 0)
-		imageLabel.BackgroundTransparency = 1
-		imageLabel.Image = imageId
-		imageLabel.ImageTransparency = 0
-		imageLabel.Parent = billboard
-
-		-- Añadir a la tabla para que el bucle central lo procese
-		table.insert(activeBillboards, {
-			billboard = billboard,
-			headPart = headPart,
-			baseSize = size
-		})
+	-- ⚠️ Nueva verificación: si el jugador local está en Teachers o Alices, no crear nada
+	if TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name) then
+		return
 	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "TeacherBillboard"
+
+	local size = (imageId == teacherImages.AlicePhase2) and 6 or 4
+	billboard.Size = UDim2.new(size, 0, size, 0)
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.StudsOffset = Vector3.new(0, 2.7, 0)
+	billboard.Parent = headPart
+
+	local imageLabel = Instance.new("ImageLabel")
+	imageLabel.Name = "Icon"
+	imageLabel.Size = UDim2.new(1, 0, 1, 0)
+	imageLabel.BackgroundTransparency = 1
+	imageLabel.Image = imageId
+	imageLabel.ImageTransparency = 0
+	imageLabel.Parent = billboard
+
+	-- Añadir a la tabla para que el bucle central lo procese
+	table.insert(activeBillboards, {
+		billboard = billboard,
+		headPart = headPart,
+		baseSize = size
+	})
+end
 
 	-- 🔧 OPTIMIZACIÓN 1: Bucle ÚNICO para actualizar todos los billboards
 	-- Este bucle maneja todos los billboards en 'activeBillboards'
