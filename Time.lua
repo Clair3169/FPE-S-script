@@ -1,3 +1,5 @@
+-- LocalScript (puedes ejecutar en la Command Bar o como GUI script)
+
 local SoundService = game:GetService("SoundService")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players:GetPlayers()[1]
@@ -14,7 +16,7 @@ screenGui.Parent = playerGui
 local label = screenGui:FindFirstChild("TimerLabel") or Instance.new("TextLabel")
 label.Name = "TimerLabel"
 label.Size = UDim2.new(0, 90, 0, 28) -- más pequeño
-label.Position = UDim2.new(0.5, -45, 0, -3) -- arriba y centrado
+label.Position = UDim2.new(0.5, -45, 0, 8) -- arriba y centrado
 label.BackgroundTransparency = 1
 label.TextColor3 = Color3.fromRGB(255, 255, 255)
 label.TextScaled = true
@@ -23,14 +25,14 @@ label.Text = "--:--"
 label.Visible = true
 label.Parent = screenGui
 
--- Referencias de sonidos
-local phaseSongs = SoundService:WaitForChild("AllMusic"):WaitForChild("PhaseSongs")
-local base = phaseSongs:WaitForChild("Base")
-local phase2 = phaseSongs:WaitForChild("Phase2")
+-- Ruta base de los sonidos
+local base = SoundService
+	:WaitForChild("AllMusic")
+	:WaitForChild("PhaseSongs")
+	:WaitForChild("Base")
 
 local quietHalls = base:WaitForChild("QuietHalls")
 local properBehavior = base:WaitForChild("ProperBehavior")
-local studentSound = phase2:WaitForChild("Student")
 
 -- Función de formato MM:SS
 local function formatTime(seconds)
@@ -40,7 +42,10 @@ local function formatTime(seconds)
 end
 
 -- Esperar hasta que los sonidos tengan duración
-repeat task.wait() until quietHalls.TimeLength > 0 and properBehavior.TimeLength > 0 and studentSound.TimeLength > 0
+repeat task.wait() until quietHalls.TimeLength > 0 and properBehavior.TimeLength > 0
+
+print("[Temporizador activo]")
+print("QuietHalls:", quietHalls.TimeLength, "ProperBehavior:", properBehavior.TimeLength)
 
 -- Comprobar si el jugador está en Alices o Teachers
 local function isInExcludedFolder()
@@ -53,12 +58,12 @@ end
 -- Bucle principal del temporizador
 task.spawn(function()
 	while task.wait(0.1) do
+		-- Ocultar si está en carpeta excluida
 		label.Visible = not isInExcludedFolder()
 
+		-- Detectar qué sonido está activo
 		local activeSound
-		if studentSound.IsPlaying then
-			activeSound = studentSound
-		elseif properBehavior.IsPlaying then
+		if properBehavior.IsPlaying then
 			activeSound = properBehavior
 		elseif quietHalls.IsPlaying then
 			activeSound = quietHalls
@@ -70,7 +75,7 @@ task.spawn(function()
 
 			-- Cambiar color cuando queden <= 25s
 			if remaining <= 25 then
-				label.TextColor3 = Color3.fromRGB(139, 0, 0)
+				label.TextColor3 = Color3.fromRGB(139, 0, 0) -- rojo oscuro
 			else
 				label.TextColor3 = Color3.fromRGB(255, 255, 255)
 			end
