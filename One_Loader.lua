@@ -131,9 +131,3 @@ global_env.FPE_Loader = instance
 
 -- Auto-load inicial (intentar cargar todos los scripts conocidos)
 instance:load_all()
-
--- FIN del LocalScript. Ahora puedes usar global_env.FPE_Loader desde la consola o desde otros scripts.
--- Ejemplos de uso:
--- global_env.FPE_Loader:add("https://tu-url-aqui.lua", "MiScriptNuevo", true) -- añade y carga de inmediato
--- global_env.FPE_Loader:add_many({"https://u1.lua", "https://u2.lua"}, true)
--- global_env.FPE_Loader:load_all() -- vuelve a intentar cargar todo lo que falte
