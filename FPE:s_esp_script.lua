@@ -315,32 +315,36 @@
 		return TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name)
 	end
 
-	-- ❗️ AQUÍ ESTÁ LA CORRECCIÓN
 	local function processCharacter(model)
-		if not model or not model:IsA("Model") then return end
-		
-		-- Si el modelo que estamos procesando es el del jugador local
-		-- Y el jugador local SÍ está en las carpetas (es Teacher o Alice)
-		-- Entonces no hacemos nada.
-		if model.Name == player.Name and isLocalInFolders() then
+	if not model or not model:IsA("Model") then return end
+	
+	-- ⚠️ Evitar procesar el modelo del jugador local si está dentro de Teachers o Alices
+	if model == player.Character or model.Name == player.Name then
+		local parent = model.Parent
+		if parent == TeachersFolder or parent == AlicesFolder then
+			-- El jugador local está en una de las carpetas restringidas, no crear Billboard
 			return
 		end
+	end
 
-		-- Si no es el jugador local (o el jugador no es Teacher/Alice),
-		-- continuamos con la creación del billboard con normalidad.
-		local teacherName = model:GetAttribute("TeacherName")
-		if not teacherName then return end
-		local imageId = teacherImages[teacherName]
-		if imageId then
-			local headPart = findRealHead(model)
-			if headPart then
-				createFloatingImage(headPart, imageId)
-				if teacherName == "Circle" then
-					monitorEnraged(model)
-				end
+	local teacherName = model:GetAttribute("TeacherName")
+	if not teacherName then return end
+
+	local imageId = teacherImages[teacherName]
+	if imageId then
+		local headPart = findRealHead(model)
+		if headPart then
+			-- Si el jugador local pertenece a esas carpetas, no crear tampoco para sí mismo
+			if model.Name == player.Name and (TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name)) then
+				return
+			end
+			createFloatingImage(headPart, imageId)
+			if teacherName == "Circle" then
+				monitorEnraged(model)
 			end
 		end
 	end
+end
 
 	-- ❗️ Y AQUÍ SE SIMPLIFICAN LAS LLAMADAS
 	-- Ahora simplemente llamamos a processCharacter.
