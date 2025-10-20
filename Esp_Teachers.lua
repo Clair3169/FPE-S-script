@@ -20,8 +20,8 @@ local Folders = {
 }
 
 --// 🔹 Configuración general
-local MAX_RENDER_DISTANCE = 200
-local CHECK_INTERVAL = 4
+local MAX_RENDER_DISTANCE = 250
+local CHECK_INTERVAL = 5
 local ENRAGED_IMAGE = "rbxassetid://108867117884833"
 
 --// 🔹 Imágenes base por TeacherName
