@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------------
--- 🅱️ BLOQUE B — HELLA MODE REMAKE + FLOATING IMAGES + CÁMARA + SHIFTLOCK + SPRINT
+-- 🅱️ BLOQUE B — HELLA MODE REMAKE + FLOATING IMAGES + CÁMARA TERCERA PERSONA + SHIFTLOCK + SPRINT
 ------------------------------------------------------------------------------------
 -- 🔧 Control del modo de cámara
 	local camaraEsperandoRespuesta = true
