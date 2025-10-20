@@ -1,4 +1,3 @@
--- LocalScript: FPE Loader mejorado (soporta añadir URLs dinámicamente)
 local global_env = (type(getgenv) == "function" and getgenv()) or _G
 
 -- Si ya existe el loader, reutilizarlo (para evitar recrearlo)
@@ -16,16 +15,7 @@ local function new_loader()
 
     -- tabla de scripts: lista de {name=..., url=...}
     self.scripts = {
-        {name = "Script FPE", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/FPE%3As_esp_script.lua"},
-        {name = "TextLabel", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/TextLabel.lua"},
-        {name = "JumpPower Perma", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/JumpPower_Perma.lua"},
-        {name = "Timer", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Time.lua"},
-        {name = "Students ESP", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Stundents_Esp.lua"},
-        {name = "Dialogue_Random", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Dialogues.lua"},
-        {name = "AimBot", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/AimBot.lua"},
-        {name = "Inf Stamina", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Stamina_INF.lua"},
-        {name = "Welcome Dialogue", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Welcome_Script.lua"},
-        {name = "Esp_Candies (TEMPORAL)", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Esp_Candies.lua"},
+        {name = "Script FPE", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Principal_Loader.lua"}    
     }
 
     -- tabla/set para URLs ya cargadas (evita duplicados)
