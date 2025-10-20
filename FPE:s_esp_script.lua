@@ -1,6 +1,5 @@
 ------------------------------------------------------------------------------------
 -- 🅱️ BLOQUE B — HELLA MODE REMAKE + FLOATING IMAGES + CÁMARA TERCERA PERSONA + SHIFTLOCK + SPRINT
--- ⚡ VERSIÓN OPTIMIZADA
 ------------------------------------------------------------------------------------
 -- 🔧 Control del modo de cámara
 	local camaraEsperandoRespuesta = true
@@ -18,7 +17,6 @@
 
 	local player = Players.LocalPlayer
 	local camera = Workspace.CurrentCamera
-	local activeBillboards = {} -- 🔧 OPTIMIZACIÓN 1: Tabla para el bucle central de Billboards
 
 	local ShiftLockScreenGui = Instance.new("ScreenGui")
 	local ShiftLockButton = Instance.new("ImageButton")
@@ -97,40 +95,42 @@
 	ShiftlockCursor.Visible = false
 	ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
 
-	-- 🔧 OPTIMIZACIÓN 3: CACHEAR VARIABLES DEL CURSOR
-	-- Buscamos las instancias una sola vez en lugar de en cada fotograma.
-	local debrisFolder = Workspace:WaitForChild("Debris")
-	local fakeCursor = debrisFolder and debrisFolder:WaitForChild("FakeCursor")
-	local fakeCursorAttachment = fakeCursor and fakeCursor:WaitForChild("Attachment")
-	local fakeCursorGui = fakeCursorAttachment and fakeCursorAttachment:WaitForChild("BillboardGui")
-	local frame = fakeCursorGui and fakeCursorGui:WaitForChild("Frame")
-	local uiScale = frame and frame:FindFirstChildOfClass("UIScale")
-	local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
-	
+	local function getFakeCursorAttachment()
+		local debris = Workspace:FindFirstChild("Debris")
+		if not debris then return nil end
+		local fake = debris:FindFirstChild("FakeCursor")
+		if not fake then return nil end
+		return fake:FindFirstChild("Attachment")
+	end
+
+	local function getFakeCursorUIScale()
+		local debris = Workspace:FindFirstChild("Debris")
+		if not debris then return nil end
+		local fake = debris:FindFirstChild("FakeCursor")
+		if not fake then return nil end
+		local attach = fake:FindFirstChild("Attachment")
+		if not attach then return nil end
+		local gui = attach:FindFirstChild("BillboardGui")
+		if not gui then return nil end
+		local frame = gui:FindFirstChild("Frame")
+		if not frame then return nil end
+		return frame:FindFirstChildOfClass("UIScale")
+	end
+
 	local verticalOffset = -56
 	local horizontalOffset = 5
-
-	-- Cachear el centro de la pantalla
-	local viewport = camera.ViewportSize
-	local centerX = viewport.X / 2
-	local centerY = viewport.Y / 2
-
-	-- Actualizar el centro solo cuando la ventana cambie de tamaño
-	camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-		viewport = camera.ViewportSize
-		centerX = viewport.X / 2
-		centerY = viewport.Y / 2
-	end)
-	-- 🔼 FIN DEL CACHÉ 🔼
 
 	RunService.RenderStepped:Connect(function()
 		if not ShiftlockCursor.Visible then return end
 
-		-- 🔧 OPTIMIZACIÓN 3: Usar variables cacheadas en lugar de buscarlas
-		-- Ya no se llama a getFakeCursor...() ni a camera.ViewportSize
-		
-		if fakeCursorAttachment and camera then
-			local worldPos = fakeCursorAttachment.WorldPosition
+		local attachment = getFakeCursorAttachment()
+		local uiScale = getFakeCursorUIScale()
+		local viewport = camera.ViewportSize
+		local centerX = viewport.X / 2
+		local centerY = viewport.Y / 2
+
+		if attachment and camera then
+			local worldPos = attachment.WorldPosition
 			local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
 
 			if onScreen then
@@ -154,9 +154,9 @@
 			end
 		end
 	end)
-	
-	-- El 'frame' y 'uiStroke' originales se definían aquí. Ya no son necesarios.
-	-- Se han movido al bloque de caché de arriba.
+
+	local frame = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("FakeCursor") and Workspace.Debris.FakeCursor:FindFirstChild("Attachment") and Workspace.Debris.FakeCursor.Attachment:FindFirstChild("BillboardGui") and Workspace.Debris.FakeCursor.Attachment.BillboardGui:FindFirstChild("Frame")
+	local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
 
 	if uiStroke then
 		uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
@@ -228,12 +228,8 @@
 	}
 	local enragedImage = "rbxassetid://108867117884833"
 
-	-- 🔧 OPTIMIZACIÓN 4: Función 'findRealHead' más eficiente
-	-- Reemplazada por una versión que usa FindFirstChildOfClass, que es más rápido
-	-- que usar GetDescendants dos veces.
 	local function findRealHead(model)
 		if not model or not model:IsA("Model") then return nil end
-		
 		local head = model:FindFirstChild("Head")
 		if not head then return nil end
 
@@ -242,25 +238,31 @@
 		end
 
 		if head:IsA("Model") then
-			local meshPart = head:FindFirstChildOfClass("MeshPart")
-			if meshPart then return meshPart end
-			
-			local basePart = head:FindFirstChildOfClass("BasePart")
-			if basePart then return basePart end
+			for _, v in ipairs(head:GetDescendants()) do
+				if v:IsA("MeshPart") or v:IsA("BasePart") then
+					if v:IsA("MeshPart") then
+						return v
+					end
+				end
+			end
+			for _, v in ipairs(head:GetDescendants()) do
+				if v:IsA("BasePart") then
+					return v
+				end
+			end
 		end
 
 		return nil
 	end
 
-
-    -- 🔧 OPTIMIZACIÓN 1: 'createFloatingImage' modificada
+	   -- 🔧 OPTIMIZACIÓN 1: 'createFloatingImage' modificada
 -- Añadida verificación para evitar creación si el jugador local está dentro de Teachers o Alices
 local function createFloatingImage(headPart, imageId)
 	if not headPart or not headPart:IsA("BasePart") then return end
 	if headPart:FindFirstChild("TeacherBillboard") then return end
 
 	-- ⚠️ Nueva verificación: si el jugador local está en Teachers o Alices, no crear nada
-	if TeachersFolder:FindFirstChild(player.Name) or AlicesFolder:FindFirstChild(player.Name) then
+	if TeachersFolder:FindFirstChild(player.Name) then
 		return
 	end
 
@@ -289,34 +291,6 @@ local function createFloatingImage(headPart, imageId)
 		baseSize = size
 	})
 end
-
-	-- 🔧 OPTIMIZACIÓN 1: Bucle ÚNICO para actualizar todos los billboards
-	-- Este bucle maneja todos los billboards en 'activeBillboards'
-	-- en lugar de tener un bucle por cada billboard.
-	RunService.RenderStepped:Connect(function()
-		if #activeBillboards == 0 then return end -- No hacer nada si la tabla está vacía
-
-		local camPos = camera.CFrame.Position
-		
-		-- Iteramos hacia atrás para poder eliminar elementos de forma segura
-		for i = #activeBillboards, 1, -1 do
-			local data = activeBillboards[i]
-			local billboard = data.billboard
-			local headPart = data.headPart
-
-			-- Limpieza: Si el billboard o la cabeza ya no existen, los eliminamos de la tabla
-			if not billboard.Parent or not headPart.Parent then
-				table.remove(activeBillboards, i)
-			else
-				-- Actualizamos el tamaño
-				local headPos = headPart.Position
-				local distance = (headPos - camPos).Magnitude
-				local scale = math.clamp(distance / 25, 0.8, 3.5)
-				billboard.Size = UDim2.new(data.baseSize * scale, 0, data.baseSize * scale, 0)
-			end
-		end
-	end)
-
 
 	local function monitorEnraged(model)
 		local headPart = findRealHead(model)
@@ -439,31 +413,13 @@ end
 		child:Destroy()
 	end)
 
-	-- 🔧 OPTIMIZACIÓN 2: Reemplazar RenderStepped por eventos para los efectos de luz
-	-- Esto evita correr código en cada fotograma innecesariamente.
 	local blackout = Lighting:FindFirstChild("BlackoutColorCorrection")
 	local darkness = Lighting:FindFirstChild("DarknessColorCorrection")
 
-	local function forceDisable(effect)
-		if effect.Enabled then
-			effect.Enabled = false
-		end
-	end
-
-	if blackout then
-		blackout.Enabled = false -- Desactivarlo una vez al inicio
-		blackout:GetPropertyChangedSignal("Enabled"):Connect(function()
-			forceDisable(blackout)
-		end)
-	end
-
-	if darkness then
-		darkness.Enabled = false -- Desactivarlo una vez al inicio
-		darkness:GetPropertyChangedSignal("Enabled"):Connect(function()
-			forceDisable(darkness)
-		end)
-	end
-	-- El 'RunService.RenderStepped' original para esto ha sido eliminado.
+	RunService.RenderStepped:Connect(function()
+		if blackout and blackout.Enabled then blackout.Enabled = false end
+		if darkness and darkness.Enabled then darkness.Enabled = false end
+	end)
 
 	local playerGui = player:WaitForChild("PlayerGui")
 
