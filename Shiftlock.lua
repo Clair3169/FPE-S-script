@@ -7,6 +7,18 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
+-- Esperar a que exista la llave de cámara
+local hasThirdPerson = player:WaitForChild("ThirdPersonEnabled", 10)
+if not hasThirdPerson then return end
+
+-- Si el jugador dijo "No", eliminar todo el sistema de shiftlock
+if not hasThirdPerson.Value then
+	local gui = CoreGui:FindFirstChild("Shiftlock (CoreGui)")
+	if gui then gui:Destroy() end
+	return
+end
+
+-- Crear elementos si la llave está activa
 local ShiftLockScreenGui = Instance.new("ScreenGui")
 local ShiftLockButton = Instance.new("ImageButton")
 local ShiftlockCursor = Instance.new("ImageLabel")
@@ -47,7 +59,6 @@ ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
 
 local verticalOffset = -57
 local horizontalOffset = 5
-
 local viewport = camera.ViewportSize
 local centerX = viewport.X / 2
 local centerY = viewport.Y / 2
