@@ -11,7 +11,8 @@ local Folders = {
 	Teachers = Workspace:WaitForChild("Teachers"),
 }
 
-local MAX_RENDER_DISTANCE = 250
+local MAX_RENDER_DISTANCE = 300
+-- cuantas imágenes flotantes se permite
 local CHECK_INTERVAL = 5
 local ENRAGED_IMAGE = "rbxassetid://108867117884833"
 
