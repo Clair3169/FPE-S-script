@@ -11,6 +11,8 @@ hasThirdPerson.Parent = player
 local bindableFunction = Instance.new("BindableFunction")
 bindableFunction.OnInvoke = function(buttonClicked)
 	if buttonClicked == "Yess!!" then
+		-- Tercera persona
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/3rd_Person.lua", true))()
 		hasThirdPerson.Value = true
 	elseif buttonClicked == "Nha" then
 		hasThirdPerson.Value = false
