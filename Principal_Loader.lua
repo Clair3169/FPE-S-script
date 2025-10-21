@@ -31,4 +31,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Anti Blackout #10
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Blackout.lua", true))()
 
+-- Teachers Esp
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Teachers_Esp.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
