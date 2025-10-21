@@ -28,5 +28,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Esp_Candies (TEMPORAL)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Esp_Candies.lua", true))()
 
+-- Anti Blackout #10
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Blackout.lua", true))()
 
 -- loadstring(game:HttpGet("URL_AQUI", true))()
