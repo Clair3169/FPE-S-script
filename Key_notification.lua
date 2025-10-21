@@ -10,9 +10,9 @@ hasThirdPerson.Parent = player
 
 local bindableFunction = Instance.new("BindableFunction")
 bindableFunction.OnInvoke = function(buttonClicked)
-	if buttonClicked == "Yes" then
+	if buttonClicked == "Yess!!" then
 		hasThirdPerson.Value = true
-	elseif buttonClicked == "No" then
+	elseif buttonClicked == "Nha" then
 		hasThirdPerson.Value = false
 	end
 end
