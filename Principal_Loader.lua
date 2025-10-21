@@ -1,5 +1,5 @@
--- Script FPE. #1
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/FPE%3As_esp_script.lua", true))()
+-- Script Tercera persona + Shift lock + preguntaGui #1
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Key_notification.lua", true))()
 
 -- TextLabel #2
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/TextLabel.lua", true))()
