@@ -3,22 +3,20 @@ local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- Esperar a que exista la llave de cámara
 local hasThirdPerson = player:WaitForChild("ThirdPersonEnabled", 10)
 if not hasThirdPerson then return end
 
--- Si el jugador dijo "No", eliminar todo el sistema de shiftlock
 if not hasThirdPerson.Value then
 	local gui = CoreGui:FindFirstChild("Shiftlock (CoreGui)")
 	if gui then gui:Destroy() end
 	return
 end
 
--- Crear elementos si la llave está activa
 local ShiftLockScreenGui = Instance.new("ScreenGui")
 local ShiftLockButton = Instance.new("ImageButton")
 local ShiftlockCursor = Instance.new("ImageLabel")
@@ -108,7 +106,7 @@ if uiStroke then
 	end)
 end
 
-ShiftLockButton.MouseButton1Click:Connect(function()
+local function toggleShiftLock()
 	if not Active then
 		Active = RunService.RenderStepped:Connect(function()
 			if player.Character and player.Character:FindFirstChild("Humanoid") then
@@ -152,7 +150,24 @@ ShiftLockButton.MouseButton1Click:Connect(function()
 			Active = nil
 		end)
 	end
-end)
+end
+
+local isPC = UserInputService.KeyboardEnabled
+
+if isPC then
+	ShiftLockButton.Visible = false
+	
+	local function handleKeyInput(actionName, inputState, inputObject)
+		if inputState == Enum.UserInputState.Begin then
+			toggleShiftLock()
+		end
+	end
+	
+	ContextActionService:BindAction("CustomShiftLockToggle", handleKeyInput, false, Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl)
+	
+else
+	ShiftLockButton.MouseButton1Click:Connect(toggleShiftLock)
+end
 
 local function ShiftLock() end
 ContextActionService:BindAction("Shift Lock", ShiftLock, false, "On")
