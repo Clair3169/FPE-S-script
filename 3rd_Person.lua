@@ -4,7 +4,7 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local MIN_ZOOM = 4
-local MAX_ZOOM = 5
+local MAX_ZOOM = 4
 
 local function waitCamera()
 	local cam
