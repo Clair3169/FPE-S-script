@@ -18,10 +18,11 @@ bindableFunction.OnInvoke = function(buttonClicked)
 end
 
 StarterGui:SetCore("SendNotification", {
-	Title = "Pregunta",
-	Text = "¿Quieres cámara en tercera persona?",
-	Duration = 10,
+	Title = "Hey you!",
+	Text = "Do you want to activate third person mode?",
+	Icon = "rbxassetid://97207642508375",
+	Duration = 20,
 	Callback = bindableFunction,
-	Button1 = "Yes",
-	Button2 = "No"
+	Button1 = "Yess!!",
+	Button2 = "Nha"
 })
