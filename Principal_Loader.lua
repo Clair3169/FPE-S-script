@@ -34,7 +34,10 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Teachers Esp
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Teachers_Esp.lua", true))()
 
--- Borrar areas de mapa
+-- Borrar areas de mapa #11
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Delete_Areas.lua", true))()
+
+-- Anti visual Enraged Circle #12
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Visual_Enraged.lua", true))()
 
 -- loadstring(game:HttpGet("URL_AQUI", true))()
