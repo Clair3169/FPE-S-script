@@ -150,37 +150,50 @@ local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	end
 end
 
+-- ✅ Función auxiliar para obtener la cabeza física (BasePart o MeshPart real)
+local function getRealHead(model)
+	if not model then return nil end
+
+	local head = model:FindFirstChild("Head")
+	if not head then return nil end
+
+	-- Si el "Head" es un Model (caso AlicePhase2), busca dentro el verdadero MeshPart
+	if head:IsA("Model") then
+		local innerHead = head:FindFirstChild("Head")
+		if innerHead and innerHead:IsA("BasePart") then
+			return innerHead
+		end
+	end
+
+	-- Si el Head ya es un BasePart normal
+	if head:IsA("BasePart") then
+		return head
+	end
+
+	return nil
+end
+
+
+-- 💫 Bucle principal: control de distancia sin errores
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
 	if not myChar then return end
 
-	local myHead = myChar:FindFirstChild("Head")
+	local myHead = getRealHead(myChar)
 	if not myHead then return end
 
-	-- Si el Head del jugador es un modelo con otro Head dentro
-	if myHead:IsA("Model") then
-		myHead = myHead:FindFirstChild("Head")
-		if not (myHead and myHead:IsA("BasePart")) then return end
-	end
-
-	local myPos = myHead.Position
+	local ok, myPos = pcall(function() return myHead.Position end)
+	if not ok then return end
 
 	for model, data in pairs(ActiveBillboards) do
-		local head = model:FindFirstChild("Head")
+		local targetHead = getRealHead(model)
 
-		if head then
-			-- Si el Head es un modelo, busca el Head real dentro
-			if head:IsA("Model") then
-				head = head:FindFirstChild("Head")
-			end
-		end
-
-		if head and head:IsA("BasePart") then
-			local ok, dist = pcall(function()
-				return (head.Position - myPos).Magnitude
+		if targetHead then
+			local success, dist = pcall(function()
+				return (targetHead.Position - myPos).Magnitude
 			end)
 
-			if ok then
+			if success then
 				data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
 			else
 				data.Billboard.Enabled = false
