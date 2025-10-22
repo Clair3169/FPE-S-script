@@ -34,4 +34,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Teachers Esp
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Teachers_Esp.lua", true))()
 
+-- Borrar areas de mapa
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Delete_Areas.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
