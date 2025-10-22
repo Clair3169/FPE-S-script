@@ -152,15 +152,29 @@ end
 
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
-	if not myChar or not myChar:FindFirstChild("Head") then return end
-	local myPos = myChar.Head.Position
+	if not myChar then return end
+
+	local head = myChar:FindFirstChild("Head")
+	if not (head and head:IsA("BasePart")) then return end
+
+	local myPos = head.Position
+
 	for model, data in pairs(ActiveBillboards) do
-		-- Verificamos si el modelo existe y tiene una cabeza
-		if model and model:FindFirstChild("Head") then
-			local dist = (model.Head.Position - myPos).Magnitude
-			data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
+		-- Validar existencia y tipo del modelo y su cabeza
+		local headPart = model:FindFirstChild("Head")
+		if model and headPart and headPart:IsA("BasePart") then
+			local dist
+			-- Proteger el cálculo de distancia dentro de un pcall por si la cabeza se elimina en ese instante
+			local success, result = pcall(function()
+				return (headPart.Position - myPos).Magnitude
+			end)
+			if success then
+				dist = result
+				data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
+			else
+				data.Billboard.Enabled = false
+			end
 		else
-			-- El modelo no existe, lo removemos
 			removeFloatingImage(model)
 		end
 	end
