@@ -1,7 +1,9 @@
+--// Servicios
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
+--// Variables principales
 local LocalPlayer = Players.LocalPlayer
 local PlayerModel = nil
 
@@ -28,6 +30,7 @@ local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
 	AlicePhase2 = true,
 }
 
+--// Función para crear el BillboardGui
 local function createBillboard(imageId)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "FloatingImage"
@@ -43,6 +46,7 @@ local function createBillboard(imageId)
 	return billboard
 end
 
+--// Detectar carpeta del jugador local
 local function detectPlayerFolder()
 	for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
 		local folder = Folders[folderName]
@@ -53,6 +57,7 @@ local function detectPlayerFolder()
 	return nil
 end
 
+--// Almacenamiento de billboards activos
 local ActiveBillboards = {}
 
 local function removeFloatingImage(model)
@@ -101,6 +106,7 @@ local function clearAllBillboardsFromFolder(folder)
 	end
 end
 
+--// Manejo de atributos (Enraged / Normal)
 local function monitorAttributes(model)
 	if not model then return end
 	local teacherName = model:GetAttribute("TeacherName")
@@ -123,6 +129,7 @@ local function monitorAttributes(model)
 	updateImage()
 end
 
+--// Escanear modelos en carpeta
 local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	for _, model in ipairs(folder:GetChildren()) do
 		if not model:IsA("Model") or not model:FindFirstChild("Head") then
@@ -143,6 +150,7 @@ local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	end
 end
 
+--// Control visual en tiempo real
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
 	if not myChar or not myChar:FindFirstChild("Head") then return end
@@ -164,29 +172,69 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
-local function autoCheckFolders()
-	while task.wait(CHECK_INTERVAL) do
-		local myFolder = detectPlayerFolder()
-		local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
+--// NUEVO: Control inteligente de escaneo (pausa/reanuda según contenido)
+local autoCheckActive = false
+local autoCheckConnection = nil
 
-		local teacherCount = #Folders.Teachers:GetChildren()
-		if teacherCount > 0 then
-			local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
-			scanFolder(Folders.Teachers, false, filter)
-		else
-			clearAllBillboardsFromFolder(Folders.Teachers)
-		end
+local function startAutoCheck()
+	if autoCheckActive then return end
+	autoCheckActive = true
+	autoCheckConnection = task.spawn(function()
+		while autoCheckActive do
+			local totalObjects = 0
+			for _, f in pairs(Folders) do
+				totalObjects += #f:GetChildren()
+			end
 
-		local aliceCount = #Folders.Alices:GetChildren()
-		local skipLocalInAlices = myFolder and myFolder.Name == "Alices"
-		if aliceCount > 0 then
-			scanFolder(Folders.Alices, skipLocalInAlices, nil)
-		else
-			clearAllBillboardsFromFolder(Folders.Alices)
+			if totalObjects == 0 then
+				autoCheckActive = false
+				break
+			end
+
+			local myFolder = detectPlayerFolder()
+			local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
+
+			local teacherCount = #Folders.Teachers:GetChildren()
+			if teacherCount > 0 then
+				local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
+				scanFolder(Folders.Teachers, false, filter)
+			else
+				clearAllBillboardsFromFolder(Folders.Teachers)
+			end
+
+			local aliceCount = #Folders.Alices:GetChildren()
+			local skipLocalInAlices = myFolder and myFolder.Name == "Alices"
+			if aliceCount > 0 then
+				scanFolder(Folders.Alices, skipLocalInAlices, nil)
+			else
+				clearAllBillboardsFromFolder(Folders.Alices)
+			end
+
+			task.wait(CHECK_INTERVAL)
 		end
-	end
+	end)
 end
 
+--// Evento que detecta cuando se añaden o eliminan objetos para pausar/reanudar
+for _, folder in pairs(Folders) do
+	folder.ChildAdded:Connect(function()
+		if not autoCheckActive then
+			startAutoCheck()
+		end
+	end)
+
+	folder.ChildRemoved:Connect(function()
+		local total = 0
+		for _, f in pairs(Folders) do
+			total += #f:GetChildren()
+		end
+		if total == 0 then
+			autoCheckActive = false
+		end
+	end)
+end
+
+--// Detección inicial del modelo del jugador
 task.spawn(function()
 	repeat
 		for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
@@ -198,5 +246,5 @@ task.spawn(function()
 		end
 		task.wait(1)
 	until PlayerModel
-	task.spawn(autoCheckFolders)
+	startAutoCheck()
 end)
