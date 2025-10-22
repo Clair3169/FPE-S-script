@@ -24,6 +24,12 @@ local TeacherImages = {
 	AlicePhase2 = "rbxassetid://78066130044573",
 }
 
+-- Definimos las teachers a mostrar si el jugador está en la carpeta 'Teachers'
+local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
+	Alice = true,
+	AlicePhase2 = true,
+}
+
 local function createBillboard(imageId)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "FloatingImage"
@@ -40,7 +46,7 @@ local function createBillboard(imageId)
 end
 
 local function detectPlayerFolder()
-	for _, folderName in ipairs({"Alices", "Students"}) do
+	for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do -- Asegúrate de incluir 'Teachers' aquí para la detección
 		local folder = Folders[folderName]
 		if folder and folder:FindFirstChild(LocalPlayer.Name) then
 			return folder
@@ -65,7 +71,10 @@ local function attachFloatingImage(model, imageId)
 	end
 	if not headPart then return end
 	if ActiveBillboards[model] then
-		ActiveBillboards[model].ImageLabel.Image = imageId
+		-- Si ya existe, actualiza la imagen si es diferente o simplemente retorna
+		if ActiveBillboards[model].ImageLabel.Image ~= imageId then
+			ActiveBillboards[model].ImageLabel.Image = imageId
+		end
 		return
 	end
 	local billboard = createBillboard(imageId)
@@ -86,7 +95,10 @@ end
 
 local function clearAllBillboardsFromFolder(folder)
 	for _, model in ipairs(folder:GetChildren()) do
-		removeFloatingImage(model)
+		-- Solo intentamos remover si el modelo está en nuestra lista de activos
+		if ActiveBillboards[model] then
+			removeFloatingImage(model)
+		end
 	end
 end
 
@@ -95,7 +107,10 @@ local function monitorAttributes(model)
 	local teacherName = model:GetAttribute("TeacherName")
 	local normalImage = TeacherImages[teacherName]
 	if not normalImage then return end
+	
+	-- Aquí es donde se adjunta inicialmente
 	attachFloatingImage(model, normalImage)
+	
 	local function updateImage()
 		local enraged = model:GetAttribute("Enraged")
 		if enraged == true then
@@ -104,16 +119,32 @@ local function monitorAttributes(model)
 			attachFloatingImage(model, normalImage)
 		end
 	end
+	
+	-- Conectamos la señal para actualizar si el estado "Enraged" cambia
 	model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
+	
+	-- Llamamos una vez para asegurar el estado inicial
 	updateImage()
 end
 
-local function scanFolder(folder, skipLocal)
+-- Modificamos scanFolder para aceptar un filtro de nombres
+local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	for _, model in ipairs(folder:GetChildren()) do
 		if model:IsA("Model") and model:FindFirstChild("Head") then
 			if skipLocal and model.Name == LocalPlayer.Name then
 				continue
 			end
+			
+			local teacherName = model:GetAttribute("TeacherName")
+			
+			-- Aplicar la lógica de filtrado solo si 'onlyTeachersToShow' está presente
+			if onlyTeachersToShow and teacherName and not onlyTeachersToShow[teacherName] then
+				-- Si no es Alice o AlicePhase2, asegúrate de que no tenga un Billboard activo
+				removeFloatingImage(model) 
+				continue
+			end
+			
+			-- Si llegamos aquí, creamos/actualizamos el Billboard
 			monitorAttributes(model)
 		end
 	end
@@ -124,39 +155,52 @@ RunService.Heartbeat:Connect(function()
 	if not myChar or not myChar:FindFirstChild("Head") then return end
 	local myPos = myChar.Head.Position
 	for model, data in pairs(ActiveBillboards) do
+		-- Verificamos si el modelo existe y tiene una cabeza
 		if model and model:FindFirstChild("Head") then
 			local dist = (model.Head.Position - myPos).Magnitude
 			data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
 		else
+			-- El modelo no existe, lo removemos
 			removeFloatingImage(model)
 		end
 	end
 end)
 
 local function autoCheckFolders()
-	while true do
-		local teacherCount = #Folders.Teachers:GetChildren()
-		local aliceCount = #Folders.Alices:GetChildren()
+	while task.wait(CHECK_INTERVAL) do
 		local myFolder = detectPlayerFolder()
-		if myFolder then
-			if teacherCount >= 1 then
-				scanFolder(Folders.Teachers, myFolder.Name == "Alices")
-			else
-				clearAllBillboardsFromFolder(Folders.Teachers)
-			end
-			if aliceCount >= 1 then
-				scanFolder(Folders.Alices, myFolder.Name == "Alices")
-			else
-				clearAllBillboardsFromFolder(Folders.Alices)
-			end
+		local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
+		
+		-- Lógica para la carpeta "Teachers"
+		local teacherCount = #Folders.Teachers:GetChildren()
+		if teacherCount >= 1 then
+			-- Si estamos en la carpeta "Teachers", aplicamos el filtro de solo Alice y AlicePhase2
+			local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
+			-- Para Teachers, siempre pasamos false para skipLocal porque no es la carpeta de 'Alices' o 'Students'
+			-- De todas formas, si estás en 'Teachers', tu modelo no tiene TeacherName, por lo que monitorAttributes no haría nada.
+			scanFolder(Folders.Teachers, false, filter) 
+		else
+			clearAllBillboardsFromFolder(Folders.Teachers)
 		end
-		task.wait(CHECK_INTERVAL)
+		
+		-- Lógica para la carpeta "Alices"
+		local aliceCount = #Folders.Alices:GetChildren()
+		-- La carpeta Alices es la única que tiene skipLocal como true si el jugador está en Alices
+		local skipLocalInAlices = myFolder and myFolder.Name == "Alices" 
+		
+		if aliceCount >= 1 then
+			-- En la carpeta Alices NUNCA aplicamos el filtro de solo Alice/AlicePhase2
+			scanFolder(Folders.Alices, skipLocalInAlices, nil) 
+		else
+			clearAllBillboardsFromFolder(Folders.Alices)
+		end
 	end
 end
 
 task.spawn(function()
 	repeat
-		for _, folderName in ipairs({"Alices", "Students"}) do
+		-- Asegúrate de que la detección para 'Teachers' también esté aquí
+		for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do 
 			local folder = Folders[folderName]
 			if folder and folder:FindFirstChild(LocalPlayer.Name) then
 				PlayerModel = folder[LocalPlayer.Name]
