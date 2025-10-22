@@ -30,6 +30,31 @@ local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
 	AlicePhase2 = true,
 }
 
+--// (SOLUCIÓN IMPORTADA DE SCRIPT1)
+--// Función robusta para obtener la cabeza (BasePart) real
+local function getRealHead(model)
+	if not model then return nil end
+	local teacherName = model:GetAttribute("TeacherName")
+	local head = model:FindFirstChild("Head")
+	if not head then return nil end
+	
+	-- Maneja el caso especial donde "Head" es un Modelo (ej: AlicePhase2)
+	if teacherName == "AlicePhase2" and head:IsA("Model") then
+		local inner = head:FindFirstChild("Head")
+		if inner and inner:IsA("BasePart") then
+			return inner -- Devuelve la BasePart interna
+		end
+	end
+	
+	-- Devuelve la cabeza si es una BasePart normal
+	if head:IsA("BasePart") then
+		return head
+	end
+	
+	-- Si "Head" existe pero no es ni una BasePart ni el caso especial, no es válido
+	return nil
+end
+
 --// Función para crear el BillboardGui
 local function createBillboard(imageId)
 	local billboard = Instance.new("BillboardGui")
@@ -70,17 +95,12 @@ end
 
 local function attachFloatingImage(model, imageId)
 	if not model then return end
-	local headPart = model:FindFirstChild("Head")
-	if not headPart then return end
-	local teacherName = model:GetAttribute("TeacherName")
-	if teacherName == "AlicePhase2" then
-		local headModel = model:FindFirstChild("Head")
-		if headModel and headModel:IsA("Model") then
-			headPart = headModel:FindFirstChild("Head")
-		end
-	end
-	if not headPart then return end
+	
+	--// (MODIFICADO) Usa la función getRealHead
+	local headPart = getRealHead(model)
+	if not headPart then return end -- Si no hay cabeza válida, no hace nada
 
+	--// El resto de la lógica de Script2 se mantiene
 	local existing = ActiveBillboards[model]
 	if existing then
 		if existing.ImageLabel and existing.ImageLabel.Image ~= imageId then
@@ -132,10 +152,14 @@ end
 --// Escanear modelos en carpeta
 local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	for _, model in ipairs(folder:GetChildren()) do
-		if not model:IsA("Model") or not model:FindFirstChild("Head") then
+		
+		--// (MODIFICADO) Usa getRealHead para validar el modelo
+		if not model:IsA("Model") or not getRealHead(model) then
 			removeFloatingImage(model)
 			continue
 		end
+		
+		--// El resto de la lógica de Script2 se mantiene
 		if skipLocal and model.Name == LocalPlayer.Name then
 			continue
 		end
@@ -153,18 +177,34 @@ end
 --// Control visual en tiempo real
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
-	if not myChar or not myChar:FindFirstChild("Head") then return end
-	local myPos = myChar.Head.Position
+	
+	--// (MODIFICADO) Usa getRealHead para el jugador local y pcall para seguridad
+	local myHead = getRealHead(myChar)
+	if not myHead then return end
+	
+	local ok, myPos = pcall(function() return myHead.Position end)
+	if not ok then return end -- Si falla al obtener la posición, detiene este frame
 
 	for model, data in pairs(ActiveBillboards) do
-		if model and model:FindFirstChild("Head") and data.Billboard then
-			local dist = (model.Head.Position - myPos).Magnitude
-			data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
+		--// (MODIFICADO) Usa getRealHead para el modelo objetivo y pcall
+		local targetHead = getRealHead(model)
+		if targetHead and data.Billboard then
+			
+			local success, dist = pcall(function()
+				return (targetHead.Position - myPos).Magnitude
+			end)
+			
+			if success then
+				data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
+			else
+				data.Billboard.Enabled = false -- Oculta si hay error al calcular dist
+			end
 		else
 			removeFloatingImage(model)
 		end
 	end
 
+	--// Esta parte de la optimización de Script2 se mantiene
 	for model in pairs(ActiveBillboards) do
 		if not model.Parent then
 			removeFloatingImage(model)
