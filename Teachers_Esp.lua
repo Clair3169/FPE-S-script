@@ -154,22 +154,33 @@ RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
 	if not myChar then return end
 
-	local head = myChar:FindFirstChild("Head")
-	if not (head and head:IsA("BasePart")) then return end
+	local myHead = myChar:FindFirstChild("Head")
+	if not myHead then return end
 
-	local myPos = head.Position
+	-- Si el Head del jugador es un modelo con otro Head dentro
+	if myHead:IsA("Model") then
+		myHead = myHead:FindFirstChild("Head")
+		if not (myHead and myHead:IsA("BasePart")) then return end
+	end
+
+	local myPos = myHead.Position
 
 	for model, data in pairs(ActiveBillboards) do
-		-- Validar existencia y tipo del modelo y su cabeza
-		local headPart = model:FindFirstChild("Head")
-		if model and headPart and headPart:IsA("BasePart") then
-			local dist
-			-- Proteger el cálculo de distancia dentro de un pcall por si la cabeza se elimina en ese instante
-			local success, result = pcall(function()
-				return (headPart.Position - myPos).Magnitude
+		local head = model:FindFirstChild("Head")
+
+		if head then
+			-- Si el Head es un modelo, busca el Head real dentro
+			if head:IsA("Model") then
+				head = head:FindFirstChild("Head")
+			end
+		end
+
+		if head and head:IsA("BasePart") then
+			local ok, dist = pcall(function()
+				return (head.Position - myPos).Magnitude
 			end)
-			if success then
-				dist = result
+
+			if ok then
 				data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
 			else
 				data.Billboard.Enabled = false
