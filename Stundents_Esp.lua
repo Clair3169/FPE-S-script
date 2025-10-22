@@ -1,4 +1,4 @@
--- 🟢 Imagen flotante (Optimizado para los 10 más cercanos)
+-- 🟢 Imagen flotante (Optimizado + pausa inteligente + límite de 27)
 repeat task.wait() until game:IsLoaded()
 
 -- ⚙️ Servicios
@@ -15,13 +15,19 @@ local VALID_FOLDERS = { "Alices", "Teachers" }
 
 -- 🖼️ Configuración
 local IMAGE_ID = "rbxassetid://126500139798475"
-local MAX_VISIBLE = 7 -- Puedes subir esto a 25 con más seguridad ahora
+local MAX_VISIBLE = 7               -- Número normal de visibles dinámicos
+local MAX_BILLBOARDS = 27           -- Límite absoluto de Billboards creados
+local MAX_STUD_DISTANCE = 200       -- Distancia máxima de detección
 
 -- ⚙️ Estado
 local systemActive = false
 local activeBillboards = {}
 local visibleStudents = {}
 local currentCamera = Workspace.CurrentCamera
+
+-- 🕹️ Control de actividad automática
+local autoCheckActive = false
+local totalStudents = 0
 
 ------------------------------------------------------------
 -- 🎥 RenderStepped (escala dinámica, ultra liviano)
@@ -49,6 +55,13 @@ local function createFloatingImage(character)
 	if not character or not character:IsA("Model") then return end
 	local head = character:FindFirstChild("Head")
 	if not head or head:FindFirstChild("FloatingImageBillboard") then return end
+
+	-- No crear más de MAX_BILLBOARDS en total
+	local count = 0
+	for _ in pairs(activeBillboards) do
+		count += 1
+	end
+	if count >= MAX_BILLBOARDS then return end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "FloatingImageBillboard"
@@ -81,18 +94,18 @@ local function destroyFloatingImage(character)
 end
 
 ------------------------------------------------------------
--- 🧩 Visibilidad de los 10 más cercanos
+-- 🧩 Visibilidad de los más cercanos
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
+	if totalStudents == 0 then return end
 
 	local localHead = localPlayer.Character:FindFirstChild("Head")
 	if not localHead then return end
 	
 	local localPos = localHead.Position
-	local MAX_STUD_DISTANCE = 150
-
 	local distances = {}
+
 	for _, student in ipairs(studentsFolder:GetChildren()) do
 		if student ~= localPlayer.Character and student:IsA("Model") then
 			local head = student:FindFirstChild("Head")
@@ -110,17 +123,23 @@ local function updateVisibleStudents()
 	end)
 
 	local newVisible = {}
+	local totalCreated = 0
+
 	for i = 1, math.min(MAX_VISIBLE, #distances) do
+		if totalCreated >= MAX_BILLBOARDS then break end
 		newVisible[distances[i][1]] = true
+		totalCreated += 1
 	end
 
-	for student, _ in pairs(visibleStudents) do
+	-- Quitar los que ya no son visibles
+	for student in pairs(visibleStudents) do
 		if not newVisible[student] then
 			destroyFloatingImage(student)
 		end
 	end
 	
-	for student, _ in pairs(newVisible) do
+	-- Agregar nuevos visibles
+	for student in pairs(newVisible) do
 		if not visibleStudents[student] then
 			createFloatingImage(student)
 		end
@@ -151,7 +170,7 @@ local function updateSystemStatus(force)
 	if systemActive then
 		updateVisibleStudents()
 	else
-		for student, _ in pairs(visibleStudents) do
+		for student in pairs(visibleStudents) do
 			destroyFloatingImage(student)
 		end
 		visibleStudents = {}
@@ -159,17 +178,29 @@ local function updateSystemStatus(force)
 end
 
 ------------------------------------------------------------
--- 🧠 Monitor de Students
+-- 🧠 Monitor de Students (pausa inteligente)
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
+	totalStudents += 1
+	if not autoCheckActive then
+		autoCheckActive = true
+	end
 	if systemActive and child ~= localPlayer.Character then
 		task.defer(updateVisibleStudents)
 	end
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
+	totalStudents = math.max(0, totalStudents - 1)
 	if visibleStudents[child] then
 		visibleStudents[child] = nil
+	end
+	if totalStudents == 0 then
+		autoCheckActive = false
+		for student in pairs(visibleStudents) do
+			destroyFloatingImage(student)
+		end
+		visibleStudents = {}
 	end
 end)
 
@@ -192,7 +223,8 @@ localPlayer.CharacterAdded:Connect(onCharacterAdded)
 task.spawn(function()
 	local lastPlayerPosition = Vector3.zero
 	while RunService.Heartbeat:Wait() do
-		if not systemActive or not localPlayer.Character then continue end
+		if not systemActive or not autoCheckActive then continue end
+		if not localPlayer.Character then continue end
 		local head = localPlayer.Character:FindFirstChild("Head")
 		if not head then continue end
 		local currentPos = head.Position
