@@ -2,10 +2,6 @@ local workspace = game:GetService("Workspace")
 
 local dronesFolder = workspace:FindFirstChild("Drones")
 
-if dronesFolder then
-	dronesFolder:ClearAllChildren()
-end
-
 local areaFolder = workspace:FindFirstChild("Area")
 local leaderboardFolder = nil
 
