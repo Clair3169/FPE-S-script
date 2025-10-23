@@ -17,7 +17,7 @@ local AIM_PARTS = {
 -- También puedes personalizar los offsets verticales para cada modo:
 local AIM_OFFSETS = {
     LibraryBook = 0,
-    Thavel = -1,
+    Thavel = 0,
     Circle = 0,
     Bloomie = 0
 }
