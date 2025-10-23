@@ -1,4 +1,4 @@
--- 🟢 Student Highlighter System (Optimizado + Prioridad de Highlight)
+-- 🟢 Student Highlighter System (Optimizado + Prioridad de Highlight + Cache persistente)
 repeat task.wait() until game:IsLoaded()
 
 -- ⚙️ Servicios
@@ -24,28 +24,48 @@ local activeHighlights = {} -- { [character] = Highlight }
 local visibleStudents = {}
 local currentCamera = Workspace.CurrentCamera
 
-------------------------------------------------------------
--- 🧩 Función: Crear Highlight (una sola vez)
-------------------------------------------------------------
-local function createHighlight(character)
-	if not character or not character:IsA("Model") then return end
-	if activeHighlights[character] then return activeHighlights[character] end
+-- 🔧 Carpeta de cache persistente
+local highlightCache = Workspace:FindFirstChild("HighlightCache_Students") or Instance.new("Folder")
+highlightCache.Name = "HighlightCache_Students"
+highlightCache.Parent = Workspace
 
+------------------------------------------------------------
+-- 🧩 Función: Obtener o crear Highlight reutilizable (cache)
+------------------------------------------------------------
+local function getOrCreateHighlight(character)
+	if not character or not character:IsA("Model") then return end
+
+	-- Si ya está en memoria activa, devolverlo
+	if activeHighlights[character] then
+		return activeHighlights[character]
+	end
+
+	-- Buscar en cache por nombre
+	local cacheName = character.Name .. "_HL_Student"
+	local cached = highlightCache:FindFirstChild(cacheName)
+	if cached and cached:IsA("Highlight") then
+		cached.Adornee = character
+		cached.Enabled = false
+		activeHighlights[character] = cached
+		return cached
+	end
+
+	-- Crear nuevo Highlight si no existe en cache
 	local highlight = Instance.new("Highlight")
-	highlight.Name = "StudentHighlight"
+	highlight.Name = cacheName
 	highlight.FillColor = Color3.fromRGB(0, 255, 0)
 	highlight.FillTransparency = 0.2
 	highlight.OutlineTransparency = 1
 	highlight.Adornee = character
 	highlight.Enabled = false
-	highlight.Parent = character
+	highlight.Parent = highlightCache
 
 	activeHighlights[character] = highlight
 	return highlight
 end
 
 ------------------------------------------------------------
--- 🧩 Función: Verificar prioridad de Highlight
+-- 🧩 Verificar prioridad de Highlight
 ------------------------------------------------------------
 local function checkHighlightPriority(character)
 	local highlight = activeHighlights[character]
@@ -67,11 +87,16 @@ end
 -- 🧩 Activar/Desactivar Highlight según visibilidad
 ------------------------------------------------------------
 local function updateHighlightState(character, state)
-	local highlight = createHighlight(character)
+	local highlight = getOrCreateHighlight(character)
 	if not highlight then return end
-	highlight.Enabled = state
+
 	if state then
+		highlight.Adornee = character
+		highlight.Enabled = true
 		checkHighlightPriority(character)
+	else
+		highlight.Enabled = false
+		highlight.Adornee = nil
 	end
 end
 
@@ -160,14 +185,18 @@ end
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if systemActive and child ~= localPlayer.Character then
-		createHighlight(child)
+		getOrCreateHighlight(child)
 		task.defer(updateVisibleStudents)
 	end
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
 	if activeHighlights[child] then
-		activeHighlights[child]:Destroy()
+		local hl = activeHighlights[child]
+		if hl then
+			hl.Adornee = nil
+			hl.Enabled = false
+		end
 		activeHighlights[child] = nil
 	end
 	if visibleStudents[child] then
@@ -207,13 +236,16 @@ task.spawn(function()
 end)
 
 ------------------------------------------------------------
--- ♻️ Limpieza automática (garbage-safe)
+-- ♻️ Limpieza inteligente (sin destruir cache)
 ------------------------------------------------------------
 RunService.Stepped:Connect(function()
 	for char, highlight in pairs(activeHighlights) do
-		if not char.Parent then
+		if not char or not char.Parent then
+			if highlight then
+				highlight.Enabled = false
+				highlight.Adornee = nil
+			end
 			activeHighlights[char] = nil
-			if highlight then highlight:Destroy() end
 		end
 	end
 end)
