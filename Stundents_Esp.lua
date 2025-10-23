@@ -14,8 +14,8 @@ local studentsFolder = Workspace:WaitForChild("Students")
 local VALID_FOLDERS = { "Alices", "Teachers" }
 
 -- ⚙️ Configuración
-local MAX_VISIBLE = 7
-local MAX_DISTANCE = 150
+local MAX_VISIBLE = 10
+local MAX_DISTANCE = 200
 local UPDATE_THRESHOLD = 5
 local systemActive = false
 
