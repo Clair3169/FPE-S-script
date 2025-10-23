@@ -14,7 +14,7 @@ local AIM_PARTS = {
     Bloomie = {"Head", "Torso"}
 }
 
--- También puedes personalizar los offsets verticales para cada modo:
+-- Ya sin offset (todo 0):
 local AIM_OFFSETS = {
     LibraryBook = 0,
     Thavel = 0,
@@ -47,21 +47,19 @@ local CAMERA_HEIGHT_OFFSET_TORSO = Vector3.new(0, 0, 0)
 local CAMERA_HEIGHT_OFFSET_HEAD  = Vector3.new(0, 0, 0)
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera -- referencia inicial
+local Camera = Workspace.CurrentCamera
 local currentTarget = nil
 
--- ====== Estado Circle (toggle) ======
+-- ====== Estado Circle ======
 local circleActive = false
 local circleButtonConnected = false
 local circleButtonReference = nil
 
--- ====== Mantener Camera actualizada (en caso de recarga o cambios) ======
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 	Camera = Workspace.CurrentCamera
 end)
 
 -- ====== UTILIDADES ======
-
 local function hasLibraryBook(character)
 	if not character then return false end
 	for _, obj in ipairs(character:GetChildren()) do
@@ -97,7 +95,6 @@ end
 local function getTargetPartByPriority(model, priorityList)
 	if not (model and priorityList) then return nil end
 	for _, name in ipairs(priorityList) do
-		-- FindFirstChild(name, true) válido en Roblox
 		local part = model:FindFirstChild(name, true)
 		if part and part:IsA("BasePart") then
 			return part
@@ -106,35 +103,24 @@ local function getTargetPartByPriority(model, priorityList)
 	return nil
 end
 
-local function lockCameraToTargetPart(targetPart, offset)
-	-- Obtenemos el personaje del jugador y su cabeza. Si no existen, no hacemos nada.
-	local character = LocalPlayer.Character
-	local head = character and character:FindFirstChild("Head")
-	
-	if not targetPart or not Workspace.CurrentCamera or not head then 
+-- ✅ NUEVA FUNCIÓN DE APUNTADO PRECISA
+local function lockCameraToTargetPart(targetPart)
+	if not targetPart or not Workspace.CurrentCamera then 
 		return 
 	end
 
-	-- 1. Calculamos la posición final del objetivo (esto ya lo tenías bien)
-	local targetCenterPosition = targetPart.Position
-	local verticalOffset = Vector3.new(0, (type(offset) == "number" and offset) or 0, 0)
-	local finalTargetPosition = targetCenterPosition + verticalOffset
+	-- Usa directamente la cámara actual
+	local camera = Workspace.CurrentCamera
+	local cameraPosition = camera.CFrame.Position
 
-	-- 2. Calculamos la nueva POSICIÓN de la cámara para que siga al jugador
-	-- Mantenemos la distancia de zoom actual que el jugador tiene con su personaje.
-	local currentZoomDistance = (Workspace.CurrentCamera.CFrame.Position - head.Position).Magnitude
-	
-	-- Calculamos la dirección desde el objetivo hacia la cabeza de nuestro jugador.
-	local directionFromTargetToHead = (head.Position - finalTargetPosition).Unit
-	
-	-- La nueva posición de la cámara será detrás de la cabeza del jugador, a la distancia de zoom actual.
-	local newCameraPosition = head.Position + (directionFromTargetToHead * currentZoomDistance)
+	-- Apunta exactamente al centro del part
+	local targetPosition = targetPart.Position
 
-	-- 3. Actualizamos la cámara para que esté en la nueva posición y apunte al objetivo.
-	Workspace.CurrentCamera.CFrame = CFrame.lookAt(newCameraPosition, finalTargetPosition)
+	-- Actualiza la cámara mirando directamente al objetivo (sin offsets)
+	camera.CFrame = CFrame.lookAt(cameraPosition, targetPosition)
 end
 
--- ====== TIMER CHECK (GameUI>Mobile>Alt>Timer) ======
+-- ====== TIMER CHECK ======
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
 	if not pg then return false end
@@ -150,13 +136,11 @@ local function isTimerVisible()
 	return ok and vis == true
 end
 
--- ====== Circle Button (GameUI>Mobile>Alt) ======
+-- ====== Circle Button ======
 local function tryConnectCircleButton()
 	if circleButtonConnected then return end
 	circleButtonConnected = true
-
 	spawn(function()
-		-- Usar WaitForChild sin timeout para mayor robustez
 		local pg = LocalPlayer:WaitForChild("PlayerGui", 10)
 		if not pg then circleButtonConnected = false return end
 		local gameUI = pg:FindFirstChild("GameUI")
@@ -170,7 +154,6 @@ local function tryConnectCircleButton()
 		end
 		circleButtonReference = altButton
 
-		-- Conectar con protección pcall
 		altButton.Activated:Connect(function()
 			if isTimerVisible() then
 				circleActive = false
@@ -187,7 +170,7 @@ end
 
 tryConnectCircleButton()
 
--- ====== Toggle PC (click derecho) ======
+-- ====== Toggle PC ======
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -266,7 +249,7 @@ local function getBloomieTargets()
 	return models
 end
 
--- ====== Elección de Target con Line of Sight robusta ======
+-- ====== Elección de Target ======
 local function chooseTarget(models, priorityList)
 	if not Camera then Camera = Workspace.CurrentCamera end
 	if not Camera then return nil end
@@ -275,7 +258,7 @@ local function chooseTarget(models, priorityList)
 	local camPos = Camera.CFrame.Position
 	local camLook = Camera.CFrame.LookVector
 	local bestModel = nil
-	local closestDistance = math.huge -- distancia más corta encontrada
+	local closestDistance = math.huge
 
 	for _, model in ipairs(models) do
 		if model and model:IsA("Model") then
@@ -284,27 +267,17 @@ local function chooseTarget(models, priorityList)
 				local dir = part.Position - camPos
 				local dist = dir.Magnitude
 				if dist > 0 then
-					-- Calcular ángulo (dot product)
 					local dirUnit = dir.Unit
 					local dot = camLook:Dot(dirUnit)
-
-					-- Solo considerar si está dentro del campo de visión permitido
 					if dot >= ANGLE_THRESHOLD then
-						
-						-- ======= 🌐 Verificación de visibilidad (Line of Sight) =======
 						local rayParams = RaycastParams.new()
 						rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 						rayParams.IgnoreWater = true
-						if LocalPlayer and LocalPlayer.Character then
-							rayParams.FilterDescendantsInstances = { LocalPlayer.Character }
-						else
-							rayParams.FilterDescendantsInstances = {}
-						end
+						rayParams.FilterDescendantsInstances = {LocalPlayer.Character or nil}
 
 						local ok, rayResult = pcall(function()
 							return Workspace:Raycast(camPos, dirUnit * dist, rayParams)
 						end)
-
 						local visible = false
 						if ok then
 							if not rayResult or not rayResult.Instance then
@@ -313,9 +286,6 @@ local function chooseTarget(models, priorityList)
 								visible = true
 							end
 						end
-						-- ============================================================
-
-						-- Si el objetivo está visible y más cercano, actualizar
 						if visible and dist < closestDistance then
 							closestDistance = dist
 							bestModel = model
@@ -325,14 +295,12 @@ local function chooseTarget(models, priorityList)
 			end
 		end
 	end
-
 	return bestModel
 end
 
 -- ======================================================
--- 🔁 LOOP PRINCIPAL (VERSIÓN FINAL CON MÁXIMA SEGURIDAD)
+-- 🔁 LOOP PRINCIPAL
 -- ======================================================
-
 local targetUpdateCounter = 0
 local currentMode = nil
 local currentTarget = nil
@@ -349,30 +317,22 @@ RunService.RenderStepped:Connect(function()
 		return 
 	end
 
-	-- =================================================================
-	-- 🛡️ SUPERBLOQUE DE SEGURIDAD PARA TODOS LOS MODOS 🛡️
-	-- Se ejecuta en cada frame para una desactivación instantánea.
-	-- =================================================================
 	if currentMode then
-		local conditionsMet = true -- Asumimos que todo está bien al principio
-
+		local conditionsMet = true
 		if currentMode == "Circle" then
 			if char:GetAttribute("TeacherName") ~= "Circle" or isTimerVisible() then
 				conditionsMet = false
-				circleActive = false -- Específico de Circle
+				circleActive = false
 				if circleButtonReference then pcall(function() circleButtonReference.ImageTransparency = 0.5 end) end
 			end
-
 		elseif currentMode == "Thavel" then
 			if char:GetAttribute("TeacherName") ~= "Thavel" or not char:GetAttribute("Charging") then
 				conditionsMet = false
 			end
-
 		elseif currentMode == "LibraryBook" then
 			if not hasLibraryBook(char) then
 				conditionsMet = false
 			end
-
 		elseif currentMode == "Bloomie" then
 			local teachersFolder = Workspace:FindFirstChild("Teachers")
 			local myModel = teachersFolder and teachersFolder:FindFirstChild(LocalPlayer.Name or "")
@@ -380,19 +340,14 @@ RunService.RenderStepped:Connect(function()
 				conditionsMet = false
 			end
 		end
-
-		-- Si alguna condición falló, limpiamos y salimos.
 		if not conditionsMet then
 			currentTarget = nil
 			currentMode = nil
 			return
 		end
 	end
-	-- =================================================================
 
 	targetUpdateCounter += 1
-
-	-- ======= Buscar objetivo cada cierto número de frames =======
 	if not currentTarget or targetUpdateCounter >= TARGET_UPDATE_INTERVAL then
 		targetUpdateCounter = 0
 		currentTarget = nil
@@ -418,13 +373,11 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- ======= Apuntar (en todos los frames) =======
 	if currentTarget and currentMode then
 		local targetParts = AIM_PARTS[currentMode]
 		local targetPart = getTargetPartByPriority(currentTarget, targetParts)
 		if targetPart then
-			local offset = AIM_OFFSETS[currentMode] or 2.5
-			lockCameraToTargetPart(targetPart, offset)
+			lockCameraToTargetPart(targetPart)
 		else
 			currentTarget = nil
 			currentMode = nil
