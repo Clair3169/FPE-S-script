@@ -9,9 +9,9 @@ local RunService = game:GetService("RunService")
 -- 👤 Jugador local
 local localPlayer = Players.LocalPlayer
 
--- 📂 Carpetas
+-- 📂 Carpetas principales
 local studentsFolder = Workspace:WaitForChild("Students")
-local VALID_FOLDERS = { "Alices", "Teachers" }
+local VALID_FOLDERS = { "Alices", "Teachers" } -- Solo en estas se activará el sistema
 
 -- ⚙️ Configuración
 local MAX_VISIBLE = 10
@@ -164,7 +164,7 @@ local function updateVisibleStudents()
 end
 
 ------------------------------------------------------------
--- 🧩 Estado del sistema (activar/desactivar según carpeta)
+-- 🧩 Estado del sistema (solo si está en Alices o Teachers)
 ------------------------------------------------------------
 local function isInValidFolder()
 	local char = localPlayer.Character
@@ -197,7 +197,7 @@ end
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if child:IsA("Model") and child ~= localPlayer.Character then
-		getOrCreateHighlight(child) -- Se agrega preasignado y desactivado
+		getOrCreateHighlight(child) -- Preasignado y desactivado
 		if systemActive then
 			task.defer(updateVisibleStudents)
 		end
