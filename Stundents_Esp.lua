@@ -1,4 +1,4 @@
--- 🟢 Imagen flotante (Optimizado + pausa inteligente + límite de 27)
+-- 🟢 Student Highlighter System (Optimizado + Prioridad de Highlight)
 repeat task.wait() until game:IsLoaded()
 
 -- ⚙️ Servicios
@@ -13,83 +13,65 @@ local localPlayer = Players.LocalPlayer
 local studentsFolder = Workspace:WaitForChild("Students")
 local VALID_FOLDERS = { "Alices", "Teachers" }
 
--- 🖼️ Configuración
-local IMAGE_ID = "rbxassetid://126500139798475"
-local MAX_VISIBLE = 7               -- Número normal de visibles dinámicos
-local MAX_BILLBOARDS = 27           -- Límite absoluto de Billboards creados
-local MAX_STUD_DISTANCE = 200       -- Distancia máxima de detección
-
--- ⚙️ Estado
+-- ⚙️ Configuración
+local MAX_VISIBLE = 7
+local MAX_DISTANCE = 150
+local UPDATE_THRESHOLD = 5
 local systemActive = false
-local activeBillboards = {}
+
+-- 🧠 Estado de caché
+local activeHighlights = {} -- { [character] = Highlight }
 local visibleStudents = {}
 local currentCamera = Workspace.CurrentCamera
 
--- 🕹️ Control de actividad automática
-local autoCheckActive = false
-local totalStudents = 0
-
 ------------------------------------------------------------
--- 🎥 RenderStepped (escala dinámica, ultra liviano)
+-- 🧩 Función: Crear Highlight (una sola vez)
 ------------------------------------------------------------
-RunService.RenderStepped:Connect(function()
-	if not systemActive or not next(activeBillboards) then return end
-	currentCamera = Workspace.CurrentCamera or currentCamera
-	local camPos = currentCamera.CFrame.Position
-
-	for billboard, head in pairs(activeBillboards) do
-		if not billboard.Parent or not head.Parent then
-			activeBillboards[billboard] = nil
-			continue
-		end
-		local distance = (camPos - head.Position).Magnitude
-		local scale = math.clamp(distance / 30, 0.6, 3.5)
-		billboard.Size = UDim2.new(scale * 3, 0, scale * 3, 0)
-	end
-end)
-
-------------------------------------------------------------
--- 🧩 Crear / Destruir Billboard
-------------------------------------------------------------
-local function createFloatingImage(character)
+local function createHighlight(character)
 	if not character or not character:IsA("Model") then return end
-	local head = character:FindFirstChild("Head")
-	if not head or head:FindFirstChild("FloatingImageBillboard") then return end
+	if activeHighlights[character] then return activeHighlights[character] end
 
-	-- No crear más de MAX_BILLBOARDS en total
-	local count = 0
-	for _ in pairs(activeBillboards) do
-		count += 1
-	end
-	if count >= MAX_BILLBOARDS then return end
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "StudentHighlight"
+	highlight.FillColor = Color3.fromRGB(0, 255, 0)
+	highlight.FillTransparency = 0.2
+	highlight.OutlineTransparency = 1
+	highlight.Adornee = character
+	highlight.Enabled = false
+	highlight.Parent = character
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "FloatingImageBillboard"
-	billboard.Adornee = head
-	billboard.Size = UDim2.new(3, 0, 3, 0)
-	billboard.StudsOffset = Vector3.new(0, 3, 0)
-	billboard.AlwaysOnTop = true
-	billboard.MaxDistance = 200
-	billboard.Parent = head
-
-	local image = Instance.new("ImageLabel")
-	image.Name = "FloatingImage"
-	image.Size = UDim2.new(1, 0, 1, 0)
-	image.BackgroundTransparency = 1
-	image.Image = IMAGE_ID
-	image.Parent = billboard
-
-	activeBillboards[billboard] = head
+	activeHighlights[character] = highlight
+	return highlight
 end
 
-local function destroyFloatingImage(character)
-	if not character or not character:IsA("Model") then return end
-	local head = character:FindFirstChild("Head")
-	if not head then return end
-	local billboard = head:FindFirstChild("FloatingImageBillboard")
-	if billboard then
-		activeBillboards[billboard] = nil
-		billboard:Destroy()
+------------------------------------------------------------
+-- 🧩 Función: Verificar prioridad de Highlight
+------------------------------------------------------------
+local function checkHighlightPriority(character)
+	local highlight = activeHighlights[character]
+	if not highlight then return end
+
+	-- Si hay otro Highlight activo en el mismo modelo
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Highlight") and child ~= highlight and child.Enabled then
+			highlight.Enabled = false
+			return
+		end
+	end
+
+	-- Si no hay otro activo, mostrar el nuestro
+	highlight.Enabled = true
+end
+
+------------------------------------------------------------
+-- 🧩 Activar/Desactivar Highlight según visibilidad
+------------------------------------------------------------
+local function updateHighlightState(character, state)
+	local highlight = createHighlight(character)
+	if not highlight then return end
+	highlight.Enabled = state
+	if state then
+		checkHighlightPriority(character)
 	end
 end
 
@@ -98,20 +80,18 @@ end
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
-	if totalStudents == 0 then return end
 
 	local localHead = localPlayer.Character:FindFirstChild("Head")
 	if not localHead then return end
-	
 	local localPos = localHead.Position
-	local distances = {}
 
+	local distances = {}
 	for _, student in ipairs(studentsFolder:GetChildren()) do
 		if student ~= localPlayer.Character and student:IsA("Model") then
 			local head = student:FindFirstChild("Head")
 			if head then
 				local dist = (localPos - head.Position).Magnitude
-				if dist < MAX_STUD_DISTANCE then
+				if dist <= MAX_DISTANCE then
 					table.insert(distances, {student, dist})
 				end
 			end
@@ -123,25 +103,23 @@ local function updateVisibleStudents()
 	end)
 
 	local newVisible = {}
-	local totalCreated = 0
-
 	for i = 1, math.min(MAX_VISIBLE, #distances) do
-		if totalCreated >= MAX_BILLBOARDS then break end
 		newVisible[distances[i][1]] = true
-		totalCreated += 1
 	end
 
-	-- Quitar los que ya no son visibles
+	-- Desactivar los que ya no están visibles
 	for student in pairs(visibleStudents) do
 		if not newVisible[student] then
-			destroyFloatingImage(student)
+			updateHighlightState(student, false)
 		end
 	end
-	
-	-- Agregar nuevos visibles
+
+	-- Activar los nuevos visibles
 	for student in pairs(newVisible) do
 		if not visibleStudents[student] then
-			createFloatingImage(student)
+			updateHighlightState(student, true)
+		else
+			checkHighlightPriority(student)
 		end
 	end
 
@@ -149,7 +127,7 @@ local function updateVisibleStudents()
 end
 
 ------------------------------------------------------------
--- 🧩 Estado del sistema
+-- 🧩 Estado del sistema (activar/desactivar según carpeta)
 ------------------------------------------------------------
 local function isInValidFolder()
 	local char = localPlayer.Character
@@ -171,41 +149,34 @@ local function updateSystemStatus(force)
 		updateVisibleStudents()
 	else
 		for student in pairs(visibleStudents) do
-			destroyFloatingImage(student)
+			updateHighlightState(student, false)
 		end
 		visibleStudents = {}
 	end
 end
 
 ------------------------------------------------------------
--- 🧠 Monitor de Students (pausa inteligente)
+-- 🧠 Monitor de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
-	totalStudents += 1
-	if not autoCheckActive then
-		autoCheckActive = true
-	end
 	if systemActive and child ~= localPlayer.Character then
+		createHighlight(child)
 		task.defer(updateVisibleStudents)
 	end
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
-	totalStudents = math.max(0, totalStudents - 1)
+	if activeHighlights[child] then
+		activeHighlights[child]:Destroy()
+		activeHighlights[child] = nil
+	end
 	if visibleStudents[child] then
 		visibleStudents[child] = nil
-	end
-	if totalStudents == 0 then
-		autoCheckActive = false
-		for student in pairs(visibleStudents) do
-			destroyFloatingImage(student)
-		end
-		visibleStudents = {}
 	end
 end)
 
 ------------------------------------------------------------
--- 🧩 Control de tu personaje
+-- 🧩 Control del personaje local
 ------------------------------------------------------------
 local function onCharacterAdded(character)
 	updateSystemStatus(true)
@@ -218,19 +189,31 @@ end
 localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
 ------------------------------------------------------------
--- ♻️ OPTIMIZACIÓN: Actualización inteligente
+-- ♻️ OPTIMIZACIÓN: actualización inteligente por movimiento
 ------------------------------------------------------------
 task.spawn(function()
-	local lastPlayerPosition = Vector3.zero
+	local lastPos = Vector3.zero
 	while RunService.Heartbeat:Wait() do
-		if not systemActive or not autoCheckActive then continue end
-		if not localPlayer.Character then continue end
+		if not systemActive or not localPlayer.Character then continue end
 		local head = localPlayer.Character:FindFirstChild("Head")
 		if not head then continue end
-		local currentPos = head.Position
-		if (currentPos - lastPlayerPosition).Magnitude > 5 then
-			lastPlayerPosition = currentPos
+
+		local pos = head.Position
+		if (pos - lastPos).Magnitude > UPDATE_THRESHOLD then
+			lastPos = pos
 			updateVisibleStudents()
+		end
+	end
+end)
+
+------------------------------------------------------------
+-- ♻️ Limpieza automática (garbage-safe)
+------------------------------------------------------------
+RunService.Stepped:Connect(function()
+	for char, highlight in pairs(activeHighlights) do
+		if not char.Parent then
+			activeHighlights[char] = nil
+			if highlight then highlight:Destroy() end
 		end
 	end
 end)
