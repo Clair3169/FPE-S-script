@@ -1,4 +1,4 @@
--- 🧠 Local Script Ultra Optimizado (Cache persistente + Highlights invisibles + Sin duplicados)
+-- 🧠 Local Script Ultra Optimizado (Roles: Teachers/Alices/Students)
 repeat task.wait() until game:IsLoaded()
 
 --// Servicios
@@ -24,12 +24,6 @@ local CHECK_INTERVAL = 5
 local COLORS = {
 	Teachers = Color3.fromRGB(255, 0, 0), -- rojo brillante
 	Alices = Color3.fromRGB(150, 0, 0),   -- rojo oscuro
-	Students = Color3.fromRGB(0, 255, 0), -- verde (por consistencia)
-}
-
-local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
-	Alice = true,
-	AlicePhase2 = true,
 }
 
 -- 🗂️ Carpeta cache persistente para todos los highlights
@@ -37,7 +31,9 @@ local HighlightCache = Workspace:FindFirstChild("HighlightCache_Main") or Instan
 HighlightCache.Name = "HighlightCache_Main"
 HighlightCache.Parent = Workspace
 
---// Obtener cabeza real
+------------------------------------------------------------
+-- 🧩 Función: Obtener cabeza real del modelo
+------------------------------------------------------------
 local function getRealHead(model)
 	if not model or not model:IsA("Model") then return nil end
 	local teacherName = model:GetAttribute("TeacherName")
@@ -57,7 +53,9 @@ local function getRealHead(model)
 	return nil
 end
 
---// Detectar carpeta del jugador local
+------------------------------------------------------------
+-- 🧩 Detectar carpeta del jugador local
+------------------------------------------------------------
 local function detectPlayerFolder()
 	for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
 		local folder = Folders[folderName]
@@ -68,7 +66,9 @@ local function detectPlayerFolder()
 	return nil
 end
 
---// Cache de highlights activos
+------------------------------------------------------------
+-- 🧩 Cache de highlights activos
+------------------------------------------------------------
 local ActiveHighlights = {}
 
 ------------------------------------------------------------
@@ -105,20 +105,7 @@ local function getOrCreateHighlight(model, folderName)
 end
 
 ------------------------------------------------------------
--- 🧩 Pre-generar todos los highlights al inicio
-------------------------------------------------------------
-task.defer(function()
-	for folderName, folder in pairs(Folders) do
-		for _, model in ipairs(folder:GetChildren()) do
-			if model:IsA("Model") then
-				getOrCreateHighlight(model, folderName)
-			end
-		end
-	end
-end)
-
-------------------------------------------------------------
--- 🧩 Remover (desactivar) Highlight sin destruirlo
+-- 🧩 Desactivar Highlight sin destruirlo
 ------------------------------------------------------------
 local function disableHighlight(model)
 	local data = ActiveHighlights[model]
@@ -130,16 +117,16 @@ local function disableHighlight(model)
 end
 
 ------------------------------------------------------------
--- 🧩 Escanear una carpeta
+-- 🧩 Escanear una carpeta según reglas del jugador local
 ------------------------------------------------------------
-local function scanFolder(folder, skipLocal, onlyTeachersToShow)
+local function scanFolder(folder, localFolderName)
 	for _, model in ipairs(folder:GetChildren()) do
 		if not model:IsA("Model") then
 			disableHighlight(model)
 			continue
 		end
 
-		if skipLocal and model.Name == LocalPlayer.Name then
+		if model.Name == LocalPlayer.Name then
 			continue
 		end
 
@@ -149,8 +136,27 @@ local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 			continue
 		end
 
-		local teacherName = model:GetAttribute("TeacherName")
-		if onlyTeachersToShow and teacherName and not onlyTeachersToShow[teacherName] then
+		-- ⚙️ Reglas de visibilidad según carpeta local
+		local allowHighlight = false
+
+		if localFolderName == "Teachers" then
+			-- Teachers solo ven Alices
+			if folder.Name == "Alices" then
+				allowHighlight = true
+			end
+		elseif localFolderName == "Alices" then
+			-- Alices solo ven Teachers
+			if folder.Name == "Teachers" then
+				allowHighlight = true
+			end
+		elseif localFolderName == "Students" then
+			-- Students ven Alices y Teachers
+			if folder.Name == "Alices" or folder.Name == "Teachers" then
+				allowHighlight = true
+			end
+		end
+
+		if not allowHighlight then
 			disableHighlight(model)
 			continue
 		end
@@ -163,7 +169,7 @@ local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 end
 
 ------------------------------------------------------------
--- 🧩 Control visual por distancia (Frame optimizado)
+-- 🧩 Control visual por distancia
 ------------------------------------------------------------
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
@@ -201,74 +207,40 @@ RunService.Heartbeat:Connect(function()
 end)
 
 ------------------------------------------------------------
--- 🧩 Estado de escaneo
+-- 🧩 Escaneo principal (controlado por carpeta local)
 ------------------------------------------------------------
-local autoCheckActive = false
 local lastScanTick = 0
-
 local function performScan()
 	local now = tick()
 	if now - lastScanTick < CHECK_INTERVAL then return end
 	lastScanTick = now
 
 	local myFolder = detectPlayerFolder()
-	local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
+	if not myFolder then return end
+	local myFolderName = myFolder.Name
 
-	-- Teachers
-	local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
-	scanFolder(Folders.Teachers, false, filter)
-
-	-- Alices
-	local skipLocalInAlices = myFolder and myFolder.Name == "Alices"
-	scanFolder(Folders.Alices, skipLocalInAlices, nil)
-
-	-- Students
-	scanFolder(Folders.Students, false, nil)
+	for folderName, folder in pairs(Folders) do
+		scanFolder(folder, myFolderName)
+	end
 end
 
 ------------------------------------------------------------
--- 🧩 Escaneo automático con throttling
+-- 🧩 Escaneo automático con intervalos
 ------------------------------------------------------------
-local function startAutoCheck()
-	if autoCheckActive then return end
-	autoCheckActive = true
-	task.spawn(function()
-		while autoCheckActive do
-			performScan()
-			task.wait(CHECK_INTERVAL)
-		end
-	end)
-end
+task.spawn(function()
+	while task.wait(CHECK_INTERVAL) do
+		performScan()
+	end
+end)
 
 ------------------------------------------------------------
--- 🧩 Monitoreo de contenido
+-- 🧩 Eventos de cambio de contenido
 ------------------------------------------------------------
 for _, folder in pairs(Folders) do
-	folder.ChildAdded:Connect(function(child)
-		if child:IsA("Model") then
-			getOrCreateHighlight(child, folder.Name)
-			task.defer(performScan)
-		end
+	folder.ChildAdded:Connect(function()
+		task.defer(performScan)
 	end)
-
 	folder.ChildRemoved:Connect(function(child)
 		disableHighlight(child)
 	end)
 end
-
-------------------------------------------------------------
--- 🧩 Detección inicial del modelo del jugador
-------------------------------------------------------------
-task.spawn(function()
-	repeat
-		for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
-			local folder = Folders[folderName]
-			if folder and folder:FindFirstChild(LocalPlayer.Name) then
-				PlayerModel = folder[LocalPlayer.Name]
-				break
-			end
-		end
-		task.wait(0.5)
-	until PlayerModel
-	startAutoCheck()
-end)
