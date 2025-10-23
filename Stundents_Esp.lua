@@ -1,4 +1,4 @@
--- 🟢 Student Highlighter System (Optimizado + Prioridad de Highlight + Cache persistente)
+-- 🟢 Student Highlighter System (Cache persistente + Pre-generado + Sin interferencias)
 repeat task.wait() until game:IsLoaded()
 
 -- ⚙️ Servicios
@@ -24,25 +24,26 @@ local activeHighlights = {} -- { [character] = Highlight }
 local visibleStudents = {}
 local currentCamera = Workspace.CurrentCamera
 
--- 🔧 Carpeta de cache persistente
+-- 🔧 Carpeta cache persistente
 local highlightCache = Workspace:FindFirstChild("HighlightCache_Students") or Instance.new("Folder")
 highlightCache.Name = "HighlightCache_Students"
 highlightCache.Parent = Workspace
 
 ------------------------------------------------------------
--- 🧩 Función: Obtener o crear Highlight reutilizable (cache)
+-- 🧩 Función: Crear o recuperar Highlight de cache
 ------------------------------------------------------------
 local function getOrCreateHighlight(character)
 	if not character or not character:IsA("Model") then return end
 
-	-- Si ya está en memoria activa, devolverlo
+	-- Si ya existe activo, devolverlo
 	if activeHighlights[character] then
 		return activeHighlights[character]
 	end
 
-	-- Buscar en cache por nombre
 	local cacheName = character.Name .. "_HL_Student"
 	local cached = highlightCache:FindFirstChild(cacheName)
+
+	-- Si ya existe en cache → solo reasignar
 	if cached and cached:IsA("Highlight") then
 		cached.Adornee = character
 		cached.Enabled = false
@@ -50,19 +51,30 @@ local function getOrCreateHighlight(character)
 		return cached
 	end
 
-	-- Crear nuevo Highlight si no existe en cache
+	-- Crear nuevo y almacenar en cache
 	local highlight = Instance.new("Highlight")
 	highlight.Name = cacheName
 	highlight.FillColor = Color3.fromRGB(0, 255, 0)
 	highlight.FillTransparency = 0.2
 	highlight.OutlineTransparency = 1
-	highlight.Adornee = character
 	highlight.Enabled = false
+	highlight.Adornee = character
 	highlight.Parent = highlightCache
 
 	activeHighlights[character] = highlight
 	return highlight
 end
+
+------------------------------------------------------------
+-- 🧩 Pre-generar cache de todos los Students al inicio
+------------------------------------------------------------
+task.defer(function()
+	for _, student in ipairs(studentsFolder:GetChildren()) do
+		if student:IsA("Model") and student ~= localPlayer.Character then
+			getOrCreateHighlight(student)
+		end
+	end
+end)
 
 ------------------------------------------------------------
 -- 🧩 Verificar prioridad de Highlight
@@ -96,7 +108,7 @@ local function updateHighlightState(character, state)
 		checkHighlightPriority(character)
 	else
 		highlight.Enabled = false
-		highlight.Adornee = nil
+		highlight.Adornee = character
 	end
 end
 
@@ -184,9 +196,11 @@ end
 -- 🧠 Monitor de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
-	if systemActive and child ~= localPlayer.Character then
-		getOrCreateHighlight(child)
-		task.defer(updateVisibleStudents)
+	if child:IsA("Model") and child ~= localPlayer.Character then
+		getOrCreateHighlight(child) -- Se agrega preasignado y desactivado
+		if systemActive then
+			task.defer(updateVisibleStudents)
+		end
 	end
 end)
 
@@ -194,14 +208,12 @@ studentsFolder.ChildRemoved:Connect(function(child)
 	if activeHighlights[child] then
 		local hl = activeHighlights[child]
 		if hl then
-			hl.Adornee = nil
 			hl.Enabled = false
+			hl.Adornee = nil
 		end
 		activeHighlights[child] = nil
 	end
-	if visibleStudents[child] then
-		visibleStudents[child] = nil
-	end
+	visibleStudents[child] = nil
 end)
 
 ------------------------------------------------------------
@@ -236,7 +248,7 @@ task.spawn(function()
 end)
 
 ------------------------------------------------------------
--- ♻️ Limpieza inteligente (sin destruir cache)
+-- ♻️ Limpieza lógica (sin eliminar cache)
 ------------------------------------------------------------
 RunService.Stepped:Connect(function()
 	for char, highlight in pairs(activeHighlights) do
