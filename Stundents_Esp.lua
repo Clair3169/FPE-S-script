@@ -55,8 +55,8 @@ local function getOrCreateHighlight(character)
 	local highlight = Instance.new("Highlight")
 	highlight.Name = cacheName
 	highlight.FillColor = Color3.fromRGB(0, 255, 0)
-	highlight.FillTransparency = 0.2
-	highlight.OutlineTransparency = 1
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
 	highlight.Adornee = character
 	highlight.Parent = highlightCache
