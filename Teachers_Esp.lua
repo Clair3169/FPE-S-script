@@ -1,3 +1,6 @@
+--// 🧠 Local Script Ultra Optimizado (Highlights en lugar de BillboardGui)
+--// Mantiene todas las mecánicas originales, mejorando el rendimiento
+
 --// Servicios
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -13,16 +16,14 @@ local Folders = {
 	Teachers = Workspace:WaitForChild("Teachers"),
 }
 
+--// Configuración
 local MAX_RENDER_DISTANCE = 300
 local CHECK_INTERVAL = 5
-local ENRAGED_IMAGE = "rbxassetid://108867117884833"
 
-local TeacherImages = {
-	Thavel = "rbxassetid://126007170470250",
-	Circle = "rbxassetid://72842137403522",
-	Bloomie = "rbxassetid://129090409260807",
-	Alice = "rbxassetid://94023609108845",
-	AlicePhase2 = "rbxassetid://78066130044573",
+--// Colores por carpeta
+local COLORS = {
+	Teachers = Color3.fromRGB(255, 0, 0), -- rojo brillante
+	Alices = Color3.fromRGB(150, 0, 0),   -- rojo oscuro
 }
 
 local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
@@ -30,45 +31,25 @@ local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
 	AlicePhase2 = true,
 }
 
---// (SOLUCIÓN IMPORTADA DE SCRIPT1)
---// Función robusta para obtener la cabeza (BasePart) real
+--// Obtener cabeza real
 local function getRealHead(model)
-	if not model then return nil end
+	if not model or not model:IsA("Model") then return nil end
 	local teacherName = model:GetAttribute("TeacherName")
 	local head = model:FindFirstChild("Head")
 	if not head then return nil end
-	
-	-- Maneja el caso especial donde "Head" es un Modelo (ej: AlicePhase2)
+
 	if teacherName == "AlicePhase2" and head:IsA("Model") then
 		local inner = head:FindFirstChild("Head")
 		if inner and inner:IsA("BasePart") then
-			return inner -- Devuelve la BasePart interna
+			return inner
 		end
 	end
-	
-	-- Devuelve la cabeza si es una BasePart normal
+
 	if head:IsA("BasePart") then
 		return head
 	end
-	
-	-- Si "Head" existe pero no es ni una BasePart ni el caso especial, no es válido
-	return nil
-end
 
---// Función para crear el BillboardGui
-local function createBillboard(imageId)
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "FloatingImage"
-	billboard.Size = UDim2.new(0, 65, 0, 65)
-	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Enabled = true
-	local img = Instance.new("ImageLabel")
-	img.BackgroundTransparency = 1
-	img.Size = UDim2.new(1, 0, 1, 0)
-	img.Image = imageId
-	img.Parent = billboard
-	return billboard
+	return nil
 end
 
 --// Detectar carpeta del jugador local
@@ -82,188 +63,164 @@ local function detectPlayerFolder()
 	return nil
 end
 
---// Almacenamiento de billboards activos
-local ActiveBillboards = {}
+--// Cache de highlights activos
+local ActiveHighlights = {}
 
-local function removeFloatingImage(model)
-	local data = ActiveBillboards[model]
-	if data and data.Billboard then
-		data.Billboard:Destroy()
-	end
-	ActiveBillboards[model] = nil
+--// Crear un Highlight
+local function createHighlight(model, folderName)
+	if not model or ActiveHighlights[model] then return end
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ModelHighlighter"
+	highlight.Adornee = model
+	highlight.Enabled = false
+	highlight.OutlineColor = COLORS[folderName] or Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 1 -- sin relleno
+	highlight.OutlineTransparency = 0
+	highlight.Parent = model
+	ActiveHighlights[model] = { Highlight = highlight, Folder = folderName }
 end
 
-local function attachFloatingImage(model, imageId)
-	if not model then return end
-	
-	--// (MODIFICADO) Usa la función getRealHead
-	local headPart = getRealHead(model)
-	if not headPart then return end -- Si no hay cabeza válida, no hace nada
-
-	--// El resto de la lógica de Script2 se mantiene
-	local existing = ActiveBillboards[model]
-	if existing then
-		if existing.ImageLabel and existing.ImageLabel.Image ~= imageId then
-			existing.ImageLabel.Image = imageId
+--// Eliminar Highlight
+local function removeHighlight(model)
+	local data = ActiveHighlights[model]
+	if data then
+		if data.Highlight and data.Highlight.Parent then
+			data.Highlight:Destroy()
 		end
-		return
-	end
-
-	local billboard = createBillboard(imageId)
-	billboard.Adornee = headPart
-	billboard.Parent = model
-	ActiveBillboards[model] = {
-		Billboard = billboard,
-		ImageLabel = billboard:FindFirstChildOfClass("ImageLabel"),
-	}
-end
-
-local function clearAllBillboardsFromFolder(folder)
-	for _, model in ipairs(folder:GetChildren()) do
-		if ActiveBillboards[model] then
-			removeFloatingImage(model)
-		end
+		ActiveHighlights[model] = nil
 	end
 end
 
---// Manejo de atributos (Enraged / Normal)
-local function monitorAttributes(model)
-	if not model then return end
-	local teacherName = model:GetAttribute("TeacherName")
-	if not teacherName then return end
-	local normalImage = TeacherImages[teacherName]
-	if not normalImage then return end
-
-	attachFloatingImage(model, normalImage)
-
-	local function updateImage()
-		local enraged = model:GetAttribute("Enraged")
-		if enraged then
-			attachFloatingImage(model, ENRAGED_IMAGE)
-		else
-			attachFloatingImage(model, normalImage)
-		end
-	end
-
-	model:GetAttributeChangedSignal("Enraged"):Connect(updateImage)
-	updateImage()
-end
-
---// Escanear modelos en carpeta
+--// Escanear una carpeta
 local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	for _, model in ipairs(folder:GetChildren()) do
-		
-		--// (MODIFICADO) Usa getRealHead para validar el modelo
-		if not model:IsA("Model") or not getRealHead(model) then
-			removeFloatingImage(model)
+		if not model:IsA("Model") then
+			removeHighlight(model)
 			continue
 		end
-		
-		--// El resto de la lógica de Script2 se mantiene
+
 		if skipLocal and model.Name == LocalPlayer.Name then
+			continue
+		end
+
+		local head = getRealHead(model)
+		if not head then
+			removeHighlight(model)
 			continue
 		end
 
 		local teacherName = model:GetAttribute("TeacherName")
 		if onlyTeachersToShow and teacherName and not onlyTeachersToShow[teacherName] then
-			removeFloatingImage(model)
+			removeHighlight(model)
 			continue
 		end
 
-		monitorAttributes(model)
+		if not ActiveHighlights[model] then
+			createHighlight(model, folder.Name)
+		end
 	end
 end
 
---// Control visual en tiempo real
+--// Limpiar carpeta completa
+local function clearHighlightsFromFolder(folder)
+	for _, model in ipairs(folder:GetChildren()) do
+		removeHighlight(model)
+	end
+end
+
+--// Control visual por distancia (Frame optimizado)
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
-	
-	--// (MODIFICADO) Usa getRealHead para el jugador local y pcall para seguridad
 	local myHead = getRealHead(myChar)
 	if not myHead then return end
-	
+
 	local ok, myPos = pcall(function() return myHead.Position end)
-	if not ok then return end -- Si falla al obtener la posición, detiene este frame
+	if not ok then return end
 
-	for model, data in pairs(ActiveBillboards) do
-		--// (MODIFICADO) Usa getRealHead para el modelo objetivo y pcall
-		local targetHead = getRealHead(model)
-		if targetHead and data.Billboard then
-			
-			local success, dist = pcall(function()
-				return (targetHead.Position - myPos).Magnitude
-			end)
-			
-			if success then
-				data.Billboard.Enabled = dist <= MAX_RENDER_DISTANCE
-			else
-				data.Billboard.Enabled = false -- Oculta si hay error al calcular dist
-			end
-		else
-			removeFloatingImage(model)
+	for model, data in pairs(ActiveHighlights) do
+		local hl = data.Highlight
+		if not hl or not model.Parent then
+			removeHighlight(model)
+			continue
 		end
-	end
 
-	--// Esta parte de la optimización de Script2 se mantiene
-	for model in pairs(ActiveBillboards) do
-		if not model.Parent then
-			removeFloatingImage(model)
+		local targetHead = getRealHead(model)
+		if not targetHead then
+			removeHighlight(model)
+			continue
+		end
+
+		local success, dist = pcall(function()
+			return (targetHead.Position - myPos).Magnitude
+		end)
+
+		if success then
+			hl.Enabled = dist <= MAX_RENDER_DISTANCE
+		else
+			hl.Enabled = false
 		end
 	end
 end)
 
---// NUEVO: Control inteligente de escaneo (pausa/reanuda según contenido)
+--// Estado de escaneo
 local autoCheckActive = false
-local autoCheckConnection = nil
+local lastScanTick = 0
 
+local function performScan()
+	local now = tick()
+	if now - lastScanTick < CHECK_INTERVAL then return end
+	lastScanTick = now
+
+	local myFolder = detectPlayerFolder()
+	local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
+
+	-- Teachers
+	local teacherCount = #Folders.Teachers:GetChildren()
+	if teacherCount > 0 then
+		local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
+		scanFolder(Folders.Teachers, false, filter)
+	else
+		clearHighlightsFromFolder(Folders.Teachers)
+	end
+
+	-- Alices
+	local aliceCount = #Folders.Alices:GetChildren()
+	local skipLocalInAlices = myFolder and myFolder.Name == "Alices"
+	if aliceCount > 0 then
+		scanFolder(Folders.Alices, skipLocalInAlices, nil)
+	else
+		clearHighlightsFromFolder(Folders.Alices)
+	end
+end
+
+--// Escaneo automático con throttling
 local function startAutoCheck()
 	if autoCheckActive then return end
 	autoCheckActive = true
-	autoCheckConnection = task.spawn(function()
+	task.spawn(function()
 		while autoCheckActive do
-			local totalObjects = 0
-			for _, f in pairs(Folders) do
-				totalObjects += #f:GetChildren()
-			end
-
-			if totalObjects == 0 then
-				autoCheckActive = false
-				break
-			end
-
-			local myFolder = detectPlayerFolder()
-			local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
-
-			local teacherCount = #Folders.Teachers:GetChildren()
-			if teacherCount > 0 then
-				local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
-				scanFolder(Folders.Teachers, false, filter)
-			else
-				clearAllBillboardsFromFolder(Folders.Teachers)
-			end
-
-			local aliceCount = #Folders.Alices:GetChildren()
-			local skipLocalInAlices = myFolder and myFolder.Name == "Alices"
-			if aliceCount > 0 then
-				scanFolder(Folders.Alices, skipLocalInAlices, nil)
-			else
-				clearAllBillboardsFromFolder(Folders.Alices)
-			end
-
+			performScan()
 			task.wait(CHECK_INTERVAL)
 		end
 	end)
 end
 
---// Evento que detecta cuando se añaden o eliminan objetos para pausar/reanudar
+--// Reaccionar a cambios de contenido
 for _, folder in pairs(Folders) do
-	folder.ChildAdded:Connect(function()
+	folder.ChildAdded:Connect(function(child)
+		if child:IsA("Model") then
+			task.defer(function()
+				local folderName = folder.Name
+				createHighlight(child, folderName)
+			end)
+		end
 		if not autoCheckActive then
 			startAutoCheck()
 		end
 	end)
 
-	folder.ChildRemoved:Connect(function()
+	folder.ChildRemoved:Connect(function(child)
+		removeHighlight(child)
 		local total = 0
 		for _, f in pairs(Folders) do
 			total += #f:GetChildren()
@@ -284,7 +241,7 @@ task.spawn(function()
 				break
 			end
 		end
-		task.wait(1)
+		task.wait(0.5)
 	until PlayerModel
 	startAutoCheck()
 end)
