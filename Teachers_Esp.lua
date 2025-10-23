@@ -1,5 +1,5 @@
---// 🧠 Local Script Ultra Optimizado (Highlights con cache persistente)
---// Mantiene todas las mecánicas originales, mejorando el rendimiento
+-- 🧠 Local Script Ultra Optimizado (Cache persistente + Highlights invisibles + Sin duplicados)
+repeat task.wait() until game:IsLoaded()
 
 --// Servicios
 local Players = game:GetService("Players")
@@ -24,6 +24,7 @@ local CHECK_INTERVAL = 5
 local COLORS = {
 	Teachers = Color3.fromRGB(255, 0, 0), -- rojo brillante
 	Alices = Color3.fromRGB(150, 0, 0),   -- rojo oscuro
+	Students = Color3.fromRGB(0, 255, 0), -- verde (por consistencia)
 }
 
 local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
@@ -31,40 +32,10 @@ local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
 	AlicePhase2 = true,
 }
 
---// 🔧 Crear carpeta de cache global (persistente)
-local HighlightCache = Workspace:FindFirstChild("HighlightCache") or Instance.new("Folder")
-HighlightCache.Name = "HighlightCache"
+-- 🗂️ Carpeta cache persistente para todos los highlights
+local HighlightCache = Workspace:FindFirstChild("HighlightCache_Main") or Instance.new("Folder")
+HighlightCache.Name = "HighlightCache_Main"
 HighlightCache.Parent = Workspace
-
---// Cache activa en memoria
-local ActiveHighlights = {} -- [model] = {Highlight = h, Folder = "Teachers"}
-
---// Buscar o crear Highlight reutilizable
-local function getOrCreateHighlight(model, folderName)
-	if not model then return end
-
-	-- Buscar si ya existe uno en cache
-	local cached = HighlightCache:FindFirstChild(model.Name .. "_HL")
-	if cached and cached:IsA("Highlight") then
-		cached.Adornee = model
-		cached.Enabled = false
-		ActiveHighlights[model] = { Highlight = cached, Folder = folderName }
-		return cached
-	end
-
-	-- Crear nuevo highlight si no hay uno en cache
-	local highlight = Instance.new("Highlight")
-	highlight.Name = model.Name .. "_HL"
-	highlight.OutlineColor = COLORS[folderName] or Color3.fromRGB(255, 255, 255)
-	highlight.FillTransparency = 1
-	highlight.OutlineTransparency = 0
-	highlight.Enabled = false
-	highlight.Adornee = model
-	highlight.Parent = HighlightCache
-
-	ActiveHighlights[model] = { Highlight = highlight, Folder = folderName }
-	return highlight
-end
 
 --// Obtener cabeza real
 local function getRealHead(model)
@@ -83,7 +54,6 @@ local function getRealHead(model)
 	if head:IsA("BasePart") then
 		return head
 	end
-
 	return nil
 end
 
@@ -98,17 +68,70 @@ local function detectPlayerFolder()
 	return nil
 end
 
---// Eliminar (desactivar) Highlight
+--// Cache de highlights activos
+local ActiveHighlights = {}
+
+------------------------------------------------------------
+-- 🧩 Obtener o crear Highlight en cache
+------------------------------------------------------------
+local function getOrCreateHighlight(model, folderName)
+	if not model or not model:IsA("Model") then return end
+
+	if ActiveHighlights[model] then
+		return ActiveHighlights[model].Highlight
+	end
+
+	local cacheName = model.Name .. "_HL_" .. folderName
+	local cached = HighlightCache:FindFirstChild(cacheName)
+
+	if cached and cached:IsA("Highlight") then
+		cached.Adornee = model
+		cached.Enabled = false
+		ActiveHighlights[model] = { Highlight = cached, Folder = folderName }
+		return cached
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = cacheName
+	highlight.Adornee = model
+	highlight.Enabled = false
+	highlight.OutlineColor = COLORS[folderName] or Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 0
+	highlight.Parent = HighlightCache
+
+	ActiveHighlights[model] = { Highlight = highlight, Folder = folderName }
+	return highlight
+end
+
+------------------------------------------------------------
+-- 🧩 Pre-generar todos los highlights al inicio
+------------------------------------------------------------
+task.defer(function()
+	for folderName, folder in pairs(Folders) do
+		for _, model in ipairs(folder:GetChildren()) do
+			if model:IsA("Model") then
+				getOrCreateHighlight(model, folderName)
+			end
+		end
+	end
+end)
+
+------------------------------------------------------------
+-- 🧩 Remover (desactivar) Highlight sin destruirlo
+------------------------------------------------------------
 local function disableHighlight(model)
 	local data = ActiveHighlights[model]
 	if data and data.Highlight then
-		data.Highlight.Adornee = nil
 		data.Highlight.Enabled = false
-		ActiveHighlights[model] = nil
+		data.Highlight.Adornee = nil
 	end
+	ActiveHighlights[model] = nil
 end
 
---// Escanear carpeta
+------------------------------------------------------------
+-- 🧩 Escanear una carpeta
+------------------------------------------------------------
 local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	for _, model in ipairs(folder:GetChildren()) do
 		if not model:IsA("Model") then
@@ -132,23 +155,16 @@ local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 			continue
 		end
 
-		if not ActiveHighlights[model] then
-			getOrCreateHighlight(model, folder.Name)
-		else
-			local hl = ActiveHighlights[model].Highlight
-			if hl then hl.Adornee = model end
+		local hl = getOrCreateHighlight(model, folder.Name)
+		if hl then
+			hl.Adornee = model
 		end
 	end
 end
 
---// Limpiar carpeta completa
-local function clearHighlightsFromFolder(folder)
-	for _, model in ipairs(folder:GetChildren()) do
-		disableHighlight(model)
-	end
-end
-
---// Control visual por distancia
+------------------------------------------------------------
+-- 🧩 Control visual por distancia (Frame optimizado)
+------------------------------------------------------------
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
 	local myHead = getRealHead(myChar)
@@ -159,22 +175,16 @@ RunService.Heartbeat:Connect(function()
 
 	for model, data in pairs(ActiveHighlights) do
 		local hl = data.Highlight
-		if not hl then
-			disableHighlight(model)
-			continue
-		end
+		if not hl then continue end
 
-		if not model.Parent then
-			-- Modelo desapareció (por muerte o eliminación)
-			hl.Enabled = false
-			hl.Adornee = nil
-			ActiveHighlights[model] = nil
+		if not model or not model.Parent then
+			disableHighlight(model)
 			continue
 		end
 
 		local targetHead = getRealHead(model)
 		if not targetHead then
-			hl.Enabled = false
+			disableHighlight(model)
 			continue
 		end
 
@@ -190,7 +200,9 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
---// Estado de escaneo
+------------------------------------------------------------
+-- 🧩 Estado de escaneo
+------------------------------------------------------------
 local autoCheckActive = false
 local lastScanTick = 0
 
@@ -203,25 +215,20 @@ local function performScan()
 	local isPlayerInTeachersFolder = myFolder and myFolder.Name == "Teachers"
 
 	-- Teachers
-	local teacherCount = #Folders.Teachers:GetChildren()
-	if teacherCount > 0 then
-		local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
-		scanFolder(Folders.Teachers, false, filter)
-	else
-		clearHighlightsFromFolder(Folders.Teachers)
-	end
+	local filter = isPlayerInTeachersFolder and TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER or nil
+	scanFolder(Folders.Teachers, false, filter)
 
 	-- Alices
-	local aliceCount = #Folders.Alices:GetChildren()
 	local skipLocalInAlices = myFolder and myFolder.Name == "Alices"
-	if aliceCount > 0 then
-		scanFolder(Folders.Alices, skipLocalInAlices, nil)
-	else
-		clearHighlightsFromFolder(Folders.Alices)
-	end
+	scanFolder(Folders.Alices, skipLocalInAlices, nil)
+
+	-- Students
+	scanFolder(Folders.Students, false, nil)
 end
 
---// Escaneo automático con throttling
+------------------------------------------------------------
+-- 🧩 Escaneo automático con throttling
+------------------------------------------------------------
 local function startAutoCheck()
 	if autoCheckActive then return end
 	autoCheckActive = true
@@ -233,16 +240,14 @@ local function startAutoCheck()
 	end)
 end
 
---// Reaccionar a cambios en las carpetas
+------------------------------------------------------------
+-- 🧩 Monitoreo de contenido
+------------------------------------------------------------
 for _, folder in pairs(Folders) do
 	folder.ChildAdded:Connect(function(child)
 		if child:IsA("Model") then
-			task.defer(function()
-				getOrCreateHighlight(child, folder.Name)
-			end)
-		end
-		if not autoCheckActive then
-			startAutoCheck()
+			getOrCreateHighlight(child, folder.Name)
+			task.defer(performScan)
 		end
 	end)
 
@@ -251,7 +256,9 @@ for _, folder in pairs(Folders) do
 	end)
 end
 
---// Detección inicial
+------------------------------------------------------------
+-- 🧩 Detección inicial del modelo del jugador
+------------------------------------------------------------
 task.spawn(function()
 	repeat
 		for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
@@ -264,23 +271,4 @@ task.spawn(function()
 		task.wait(0.5)
 	until PlayerModel
 	startAutoCheck()
-end)
-
---// 🔁 Reasignación al reaparecer
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-	PlayerModel = nil
-	task.defer(function()
-		repeat
-			for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
-				local folder = Folders[folderName]
-				if folder and folder:FindFirstChild(LocalPlayer.Name) then
-					PlayerModel = folder[LocalPlayer.Name]
-					break
-				end
-			end
-			task.wait(0.5)
-		until PlayerModel
-		task.wait(1)
-		performScan()
-	end)
 end)
