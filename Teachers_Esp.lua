@@ -1,4 +1,4 @@
---// 🧠 Local Script Ultra Optimizado (Highlights en lugar de BillboardGui)
+--// 🧠 Local Script Ultra Optimizado (Highlights con cache persistente)
 --// Mantiene todas las mecánicas originales, mejorando el rendimiento
 
 --// Servicios
@@ -30,6 +30,41 @@ local TEACHERS_TO_SHOW_IN_TEACHERS_FOLDER = {
 	Alice = true,
 	AlicePhase2 = true,
 }
+
+--// 🔧 Crear carpeta de cache global (persistente)
+local HighlightCache = Workspace:FindFirstChild("HighlightCache") or Instance.new("Folder")
+HighlightCache.Name = "HighlightCache"
+HighlightCache.Parent = Workspace
+
+--// Cache activa en memoria
+local ActiveHighlights = {} -- [model] = {Highlight = h, Folder = "Teachers"}
+
+--// Buscar o crear Highlight reutilizable
+local function getOrCreateHighlight(model, folderName)
+	if not model then return end
+
+	-- Buscar si ya existe uno en cache
+	local cached = HighlightCache:FindFirstChild(model.Name .. "_HL")
+	if cached and cached:IsA("Highlight") then
+		cached.Adornee = model
+		cached.Enabled = false
+		ActiveHighlights[model] = { Highlight = cached, Folder = folderName }
+		return cached
+	end
+
+	-- Crear nuevo highlight si no hay uno en cache
+	local highlight = Instance.new("Highlight")
+	highlight.Name = model.Name .. "_HL"
+	highlight.OutlineColor = COLORS[folderName] or Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 0
+	highlight.Enabled = false
+	highlight.Adornee = model
+	highlight.Parent = HighlightCache
+
+	ActiveHighlights[model] = { Highlight = highlight, Folder = folderName }
+	return highlight
+end
 
 --// Obtener cabeza real
 local function getRealHead(model)
@@ -63,39 +98,21 @@ local function detectPlayerFolder()
 	return nil
 end
 
---// Cache de highlights activos
-local ActiveHighlights = {}
-
---// Crear un Highlight
-local function createHighlight(model, folderName)
-	if not model or ActiveHighlights[model] then return end
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "ModelHighlighter"
-	highlight.Adornee = model
-	highlight.Enabled = false
-	highlight.OutlineColor = COLORS[folderName] or Color3.fromRGB(255, 255, 255)
-	highlight.FillTransparency = 1 -- sin relleno
-	highlight.OutlineTransparency = 0
-	highlight.Parent = model
-	ActiveHighlights[model] = { Highlight = highlight, Folder = folderName }
-end
-
---// Eliminar Highlight
-local function removeHighlight(model)
+--// Eliminar (desactivar) Highlight
+local function disableHighlight(model)
 	local data = ActiveHighlights[model]
-	if data then
-		if data.Highlight and data.Highlight.Parent then
-			data.Highlight:Destroy()
-		end
+	if data and data.Highlight then
+		data.Highlight.Adornee = nil
+		data.Highlight.Enabled = false
 		ActiveHighlights[model] = nil
 	end
 end
 
---// Escanear una carpeta
+--// Escanear carpeta
 local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 	for _, model in ipairs(folder:GetChildren()) do
 		if not model:IsA("Model") then
-			removeHighlight(model)
+			disableHighlight(model)
 			continue
 		end
 
@@ -105,18 +122,21 @@ local function scanFolder(folder, skipLocal, onlyTeachersToShow)
 
 		local head = getRealHead(model)
 		if not head then
-			removeHighlight(model)
+			disableHighlight(model)
 			continue
 		end
 
 		local teacherName = model:GetAttribute("TeacherName")
 		if onlyTeachersToShow and teacherName and not onlyTeachersToShow[teacherName] then
-			removeHighlight(model)
+			disableHighlight(model)
 			continue
 		end
 
 		if not ActiveHighlights[model] then
-			createHighlight(model, folder.Name)
+			getOrCreateHighlight(model, folder.Name)
+		else
+			local hl = ActiveHighlights[model].Highlight
+			if hl then hl.Adornee = model end
 		end
 	end
 end
@@ -124,11 +144,11 @@ end
 --// Limpiar carpeta completa
 local function clearHighlightsFromFolder(folder)
 	for _, model in ipairs(folder:GetChildren()) do
-		removeHighlight(model)
+		disableHighlight(model)
 	end
 end
 
---// Control visual por distancia (Frame optimizado)
+--// Control visual por distancia
 RunService.Heartbeat:Connect(function()
 	local myChar = LocalPlayer.Character
 	local myHead = getRealHead(myChar)
@@ -139,14 +159,22 @@ RunService.Heartbeat:Connect(function()
 
 	for model, data in pairs(ActiveHighlights) do
 		local hl = data.Highlight
-		if not hl or not model.Parent then
-			removeHighlight(model)
+		if not hl then
+			disableHighlight(model)
+			continue
+		end
+
+		if not model.Parent then
+			-- Modelo desapareció (por muerte o eliminación)
+			hl.Enabled = false
+			hl.Adornee = nil
+			ActiveHighlights[model] = nil
 			continue
 		end
 
 		local targetHead = getRealHead(model)
 		if not targetHead then
-			removeHighlight(model)
+			hl.Enabled = false
 			continue
 		end
 
@@ -205,13 +233,12 @@ local function startAutoCheck()
 	end)
 end
 
---// Reaccionar a cambios de contenido
+--// Reaccionar a cambios en las carpetas
 for _, folder in pairs(Folders) do
 	folder.ChildAdded:Connect(function(child)
 		if child:IsA("Model") then
 			task.defer(function()
-				local folderName = folder.Name
-				createHighlight(child, folderName)
+				getOrCreateHighlight(child, folder.Name)
 			end)
 		end
 		if not autoCheckActive then
@@ -220,18 +247,11 @@ for _, folder in pairs(Folders) do
 	end)
 
 	folder.ChildRemoved:Connect(function(child)
-		removeHighlight(child)
-		local total = 0
-		for _, f in pairs(Folders) do
-			total += #f:GetChildren()
-		end
-		if total == 0 then
-			autoCheckActive = false
-		end
+		disableHighlight(child)
 	end)
 end
 
---// Detección inicial del modelo del jugador
+--// Detección inicial
 task.spawn(function()
 	repeat
 		for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
@@ -244,4 +264,23 @@ task.spawn(function()
 		task.wait(0.5)
 	until PlayerModel
 	startAutoCheck()
+end)
+
+--// 🔁 Reasignación al reaparecer
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+	PlayerModel = nil
+	task.defer(function()
+		repeat
+			for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
+				local folder = Folders[folderName]
+				if folder and folder:FindFirstChild(LocalPlayer.Name) then
+					PlayerModel = folder[LocalPlayer.Name]
+					break
+				end
+			end
+			task.wait(0.5)
+		until PlayerModel
+		task.wait(1)
+		performScan()
+	end)
 end)
