@@ -55,8 +55,8 @@ ShiftlockCursor.BackgroundTransparency = 1
 ShiftlockCursor.Visible = false
 ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
 
-local verticalOffset = -57
-local horizontalOffset = 5
+local verticalOffset = -57 -- de abajo a arriba
+local horizontalOffset = 3 -- de izquierda a derecha
 local viewport = camera.ViewportSize
 local centerX = viewport.X / 2
 local centerY = viewport.Y / 2
