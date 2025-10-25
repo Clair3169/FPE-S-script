@@ -3,6 +3,19 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local localPlayer = Players.LocalPlayer
+spawn(function()
+    local target = localPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("SideBars"):WaitForChild("2StaminaBar")
+    
+    target.Visible = false -- Lo oculta la primera vez
+    
+    -- Vigila si la propiedad "Visible" cambia
+    target:GetPropertyChangedSignal("Visible"):Connect(function()
+        if target.Visible == true then
+            target.Visible = false -- Lo fuerza a falso si intenta volverse visible
+        end
+    end)
+end)
+
 if not localPlayer then return end
 
 -- Carpetas válidas
