@@ -47,6 +47,7 @@ local function applyInfiniteStamina(character)
 
 	character:SetAttribute("Stamina", 5000)
 	character:SetAttribute("MaxStamina", 5000)
+	character:SetAttribute("StaminaRegen", 100)
 	staminaCache[character] = true
 
 	-- Limpiar al destruirse
