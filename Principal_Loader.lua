@@ -40,4 +40,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-scrip
 -- Anti visual Enraged Circle #12
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Visual_Enraged.lua", true))()
 
+-- Sprintbutton solo para Claire
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/SprintFake.lua", true))()
+
 -- loadstring(game:HttpGet("URL_AQUI", true))()
