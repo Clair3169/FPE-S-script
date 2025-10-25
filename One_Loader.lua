@@ -11,8 +11,7 @@ local function new_loader()
     local self = setmetatable({}, Loader)
 
     self.scripts = {
-        {name = "Script FPE", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Principal_Loader.lua"},
-        {name = "Owner", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/SprintFake.lua"}
+        {name = "Script FPE", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Principal_Loader.lua"}
     }
 
     self.loaded_urls = global_env.FPE_loaded_urls or {}
