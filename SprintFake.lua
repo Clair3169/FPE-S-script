@@ -1,141 +1,71 @@
--- SERVICIOS Y JUGADOR
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local player = Players.LocalPlayer
+do
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LocalPlayer = Players.LocalPlayer
 
--- =================================================================
--- 2. VERIFICACIÓN DE JUGADOR
--- =================================================================
-if player.Name ~= "MINIGUEINS_PRO" then
-	return -- Detener el script si no es el jugador
-end
-
--- SERVICIOS DEL JUGADOR
-local playerGui = player:WaitForChild("PlayerGui")
-
--- 4. CARPETAS OBJETIVO (Con el timeout de 5 segundos)
-local folders = {
-	Workspace:WaitForChild("Students", 5),
-	Workspace:FindFirstChild("Alices"),
-	Workspace:FindFirstChild("Teachers")
-}
-
--- FUNCIONES DE SPRINT
-
----
--- Busca el modelo del jugador dentro de las carpetas especificadas.
---
-local function findPlayerModel()
-	for _, folder in ipairs(folders) do
-		if folder then
-			local model = folder:FindFirstChild(player.Name)
-			if model then
-				return model
-			end
-		end
+	if LocalPlayer.Name ~= "MINIGUEINS_PRO" then
+		return
 	end
-	return nil
-end
 
----
--- 5. Cambia el atributo "Running" del modelo del jugador.
---
-local function toggleRunning()
-	local model = findPlayerModel()
-	if not model then 
-		-- 1. Se eliminó el print()
-		return 
+	local CARPETAS_VALIDAS = {
+		["Alices"] = true,
+		["Teachers"] = true,
+		["Students"] = true
+	}
+
+	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
+	if not PlayerGui then
+		return
 	end
-	
-	local current = model:GetAttribute("Running")
-	if current == nil then return end
-	
-	local newState = not current
-	model:SetAttribute("Running", newState)
-end
 
--- INTERFAZ DE USUARIO (UI)
-local gameUi = playerGui:WaitForChild("GameUI")
-local mobileFrame = gameUi:WaitForChild("Mobile")
-local sprintButton = mobileFrame:WaitForChild("Sprint") -- El original
+	local GameUI = PlayerGui:WaitForChild("GameUI", 5)
+	local Mobile = GameUI and GameUI:WaitForChild("Mobile", 5)
+	local SprintOriginal = Mobile and Mobile:WaitForChild("Sprint", 5)
 
--- 3. GESTIÓN DE BOTONES
--- Ocultar el botón original PERMANENTEMENTE
-sprintButton.Visible = false
-
--- Clonar el botón
-local sprintInfButton = sprintButton:Clone()
-sprintInfButton.Name = "Sprint_Inf"
-sprintInfButton.Parent = mobileFrame
--- (Su visibilidad se define abajo)
-
----
--- Comprueba si el jugador está en las carpetas y
--- actualiza la visibilidad del BOTÓN CLONADO.
---
-local function updateSprintButtonVisibility()
-	local inSpecialFolder = false
-	
-	for _, folder in ipairs(folders) do
-		if folder and folder:FindFirstChild(player.Name) then
-			inSpecialFolder = true -- Sí está en una carpeta
-			break
-		end
+	if not SprintOriginal then
+		return
 	end
+
+	SprintOriginal.Visible = false
+
+	local SprintInf = Mobile:FindFirstChild("SprintInf")
 	
-	-- 3. El botón CLONADO se muestra (true) si NO estás en una carpeta (not inSpecialFolder)
-	--    y se oculta (false) si SÍ estás en una carpeta.
-	sprintInfButton.Visible = not inSpecialFolder
-end
+	if not SprintInf then
+		SprintInf = SprintOriginal:Clone()
+		SprintInf.Name = "SprintInf"
+		SprintInf.Parent = Mobile
 
--- CONEXIONES
-
--- 5. Conectar el clic del botón CLONADO
-sprintInfButton.MouseButton1Click:Connect(toggleRunning)
-
--- 1. Detectar movimiento entre carpetas (Optimizado)
--- Esta función solo se llamará si algo entra/sale de las carpetas
-local function onFolderChanged(child)
-	-- Solo reaccionamos si el 'child' que se movió es nuestro jugador
-	if child.Name == player.Name then
-		updateSprintButtonVisibility()
-	end
-end
-
--- Conectamos la función a las 3 carpetas
-for _, folder in ipairs(folders) do
-	if folder then
-		folder.ChildAdded:Connect(onFolderChanged)
-		folder.ChildRemoved:Connect(onFolderChanged)
-	end
-end
-
--- 2. Conectar la aparición del personaje (Respawn)
-player.CharacterAdded:Connect(function(character)
-	task.wait(0.5) 
-	updateSprintButtonVisibility() -- Comprobar visibilidad al aparecer
-
-	local humanoid = character:WaitForChild("Humanoid")
-	humanoid.Died:Connect(function()
-		-- Ocultar el botón CLONADO al morir
-		if sprintInfButton then
-			sprintInfButton.Visible = false
-		end
-	end)
-end)
-
--- 3. Comprobación inicial
--- (Por si el script se cargó después de que el personaje ya existía)
-if player.Character then
-	task.wait(0.5)
-	updateSprintButtonVisibility()
-	
-	local humanoid = player.Character:FindFirstChild("Humanoid")
-	if humanoid then
-		humanoid.Died:Connect(function()
-			if sprintInfButton then
-				sprintInfButton.Visible = false
+		SprintInf.MouseButton1Click:Connect(function()
+			local charActual = LocalPlayer.Character
+			if charActual and charActual:GetAttribute("Running") ~= nil then
+				local estadoActual = charActual:GetAttribute("Running")
+				charActual:SetAttribute("Running", not estadoActual)
 			end
 		end)
 	end
+	
+	SprintInf.Visible = false
+
+	if _G.SprintInfLoopConnection then
+		_G.SprintInfLoopConnection:Disconnect()
+	end
+
+	_G.SprintInfLoopConnection = RunService.RenderStepped:Connect(function()
+		if SprintOriginal.Visible then
+			SprintOriginal.Visible = false
+		end
+		
+		local char = LocalPlayer.Character
+		local estaEnCarpetaValida = false
+		
+		if char then
+			local parent = char.Parent
+			if parent and CARPETAS_VALIDAS[parent.Name] then
+				estaEnCarpetaValida = true
+			end
+		end
+		
+		SprintInf.Visible = estaEnCarpetaValida
+	end)
+
 end
