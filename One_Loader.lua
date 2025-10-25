@@ -12,7 +12,7 @@ local function new_loader()
 
     self.scripts = {
         {name = "Script FPE", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Principal_Loader.lua"},
-        {name = "Sprint Owner", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/SprintFake.lua"}
+        {name = "Owner", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/SprintFake.lua"}
     }
 
     self.loaded_urls = global_env.FPE_loaded_urls or {}
