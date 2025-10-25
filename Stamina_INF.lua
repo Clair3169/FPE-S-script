@@ -32,8 +32,8 @@ local function applyInfiniteStamina(character)
 	local playerFromCharacter = Players:GetPlayerFromCharacter(character)
 	if playerFromCharacter ~= localPlayer then return end
 
-	character:SetAttribute("Stamina", math.huge)
-	character:SetAttribute("MaxStamina", math.huge)
+	character:SetAttribute("Stamina", 5000)
+	character:SetAttribute("MaxStamina", 5000)
 	staminaCache[character] = true
 
 	-- Limpiar al destruirse
