@@ -1,10 +1,13 @@
--- Servicios
+-- ======================================================
+-- 💪 BOOST DE STAMINA (Optimizado)
+-- ======================================================
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
-local localPlayer = Players.LocalPlayer
 spawn(function()
-    local target = localPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("SideBars"):WaitForChild("2StaminaBar")
+    local target = LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("SideBars"):WaitForChild("2StaminaBar")
     
     target.Visible = false -- Lo oculta la primera vez
     
@@ -16,136 +19,87 @@ spawn(function()
     end)
 end)
 
-if not localPlayer then return end
+-- --- OPTIMIZACIÓN 1: Cache de referencias ---
+-- Guardamos las carpetas aquí para no buscarlas cada vez
+local folderCache = {}
+local validFolderNames = {"Students", "Alices", "Teachers"}
 
--- Carpetas válidas
-local targetFolderNames = {
-	Alices = true,
-	Teachers = true,
-	Students = true
-}
+-- Guardamos el modelo del jugador aquí para no buscarlo cada segundo
+local cachedModel = nil
 
--- Caché y conexiones
-local staminaCache = {}
-local activeConnections = {}
+-- ------------------------------------------------------
 
-local function disconnectAll()
-	for _, conn in ipairs(activeConnections) do
-		if conn and conn.Connected then
-			conn:Disconnect()
+-- 🧭 Busca el modelo del jugador (versión optimizada)
+local function getCharacterModel()
+	-- 1. Revisa si el modelo en caché sigue siendo válido
+	if cachedModel and cachedModel.Parent then
+		-- Revisa si el padre sigue siendo una de las carpetas válidas
+		local parentName = cachedModel.Parent.Name
+		if folderCache[parentName] then
+			return cachedModel -- ¡Sigue válido! No busques más.
 		end
 	end
-	table.clear(activeConnections)
-end
 
-local function applyInfiniteStamina(character)
-	if not character or not character:IsA("Model") then return end
-	if staminaCache[character] then return end
-
-	local playerFromCharacter = Players:GetPlayerFromCharacter(character)
-	if playerFromCharacter ~= localPlayer then return end
-
-	character:SetAttribute("Stamina", 5000)
-	character:SetAttribute("MaxStamina", 5000)
-	character:SetAttribute("StaminaRegen", 100)
-	staminaCache[character] = true
-
-	-- Limpiar al destruirse
-	local destroyConn
-	destroyConn = character.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			staminaCache[character] = nil
-			if destroyConn and destroyConn.Connected then
-				destroyConn:Disconnect()
+	-- 2. Si no es válido o no existe, busca de nuevo
+	cachedModel = nil -- Limpia el caché
+	for folderName, folder in pairs(folderCache) do
+		if folder then -- Asegurarse que la carpeta existe
+			local model = folder:FindFirstChild(LocalPlayer.Name)
+			if model and model:IsA("Model") then
+				cachedModel = model -- ¡Encontrado! Guárdalo en el caché
+				return model
 			end
 		end
+	end
+	
+	return nil -- No se encontró en ninguna carpeta
+end
+
+-- ⚙️ Aplica los atributos de stamina al modelo
+local function applyBoost(model)
+	-- Se le pasa el modelo para no tener que buscarlo otra vez
+	if not model then return end
+
+	-- Usamos un solo SetAttribute. Si el atributo no existe, esto lo creará.
+	-- Si tu juego REQUIERE que el atributo exista, vuelve a tu método con GetAttribute
+	model:SetAttribute("Stamina", 500)
+	model:SetAttribute("MaxStamina", 500)
+end
+
+-- === OPTIMIZACIÓN 2: Lógica Principal Unificada ===
+
+-- Función que se ejecuta una sola vez y maneja todo
+local function main()
+	
+	-- 1. Espera y encuentra las carpetas válidas UNA SOLA VEZ
+	for _, name in ipairs(validFolderNames) do
+		-- Espera hasta 15 segundos por cada carpeta. Si no aparece, la ignora.
+		local folder = Workspace:WaitForChild(name, 15)
+		if folder then
+			folderCache[name] = folder -- Guarda la carpeta en el caché
+		end
+	end
+
+	-- 2. Conexión al respawn (CharacterAdded)
+	-- Esto solo limpia el caché. El loop principal se encargará de buscar el nuevo.
+	LocalPlayer.CharacterAdded:Connect(function(character)
+		cachedModel = nil -- El modelo antiguo ya no sirve, bórralo del caché
+		-- El loop de abajo se encargará de encontrar el nuevo modelo
 	end)
-	table.insert(activeConnections, destroyConn)
-end
 
-local function watchParentChanges(character)
-	if not character then return end
-	local conn = character:GetPropertyChangedSignal("Parent"):Connect(function()
-		local parent = character.Parent
-		if parent and targetFolderNames[parent.Name] then
-			task.defer(function()
-				if character.Parent then
-					applyInfiniteStamina(character)
-				end
-			end)
+	-- 3. Loop principal de actualización (¡SOLO UNO!)
+	-- Este loop se encarga de:
+	--    a) Aplicar el boost la primera vez.
+	--    b) Aplicar el boost después de un respawn (porque cachedModel será nil).
+	--    c) Aplicar el boost si el modelo se mueve de carpeta (porque el caché se invalidará).
+	while true do 
+		local model = getCharacterModel() -- Esta función ahora es muy rápida gracias al caché
+		if model then
+			applyBoost(model)
 		end
-	end)
-	table.insert(activeConnections, conn)
-end
-
-local function monitorFolder(folder)
-	local function handleChild(child)
-		if child:IsA("Model") then
-			task.defer(function()
-				applyInfiniteStamina(child)
-				watchParentChanges(child)
-			end)
-		end
-	end
-
-	for _, child in ipairs(folder:GetChildren()) do
-		handleChild(child)
-	end
-
-	local conn = folder.ChildAdded:Connect(handleChild)
-	table.insert(activeConnections, conn)
-end
-
-local function connectTargetFolders()
-	for folderName in pairs(targetFolderNames) do
-		local folderInstance = Workspace:FindFirstChild(folderName)
-		if folderInstance then
-			monitorFolder(folderInstance)
-		else
-			local conn
-			conn = Workspace.ChildAdded:Connect(function(child)
-				if child.Name == folderName then
-					monitorFolder(child)
-					conn:Disconnect()
-				end
-			end)
-			table.insert(activeConnections, conn)
-		end
+		task.wait(1) -- Revisa solo una vez por segundo
 	end
 end
 
--- Espera segura: el personaje debe estar en el Workspace y en carpeta válida
-local function waitForValidParent(character)
-	local start = os.clock()
-	while character and os.clock() - start < 1 do -- 1 segundo máximo
-		local parent = character.Parent
-		if parent and targetFolderNames[parent.Name] then
-			return true
-		end
-		task.wait(0.05)
-	end
-	return false
-end
-
-local function onCharacterAdded(character)
-	disconnectAll()
-
-	task.defer(function()
-		if not character then return end
-
-		-- Espera a que el personaje esté realmente en juego
-		if not waitForValidParent(character) then
-			-- incluso si no está en carpeta válida aún, aplicamos por seguridad
-			applyInfiniteStamina(character)
-		end
-
-		watchParentChanges(character)
-		connectTargetFolders()
-	end)
-end
-
-localPlayer.CharacterAdded:Connect(onCharacterAdded)
-
-if localPlayer.Character then
-	onCharacterAdded(localPlayer.Character)
-end
+-- 🚀 Inicia el script principal en un hilo separado
+task.spawn(main)
