@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local MIN_ZOOM = 4
 local MAX_ZOOM = 4
 
--- ⚙️ Espera a que la cámara exista
+-- ⚙️ Espera la cámara
 local function waitCamera()
 	local cam
 	repeat
@@ -16,7 +16,7 @@ local function waitCamera()
 	return cam
 end
 
--- 🎥 Aplica la cámara de tercera persona
+-- 🎥 Aplica la cámara fija de tercera persona
 local function applyThirdPerson()
 	pcall(function()
 		player.CameraMode = Enum.CameraMode.Classic
@@ -34,55 +34,68 @@ local function applyThirdPerson()
 	end)
 end
 
--- 🧩 Configurador principal
+-- 🎥 Libera la cámara completamente (para AlicePhase2)
+local function releaseCamera()
+	pcall(function()
+		local cam = Workspace:FindFirstChildOfClass("Camera")
+		if cam then
+			cam.CameraType = Enum.CameraType.Custom -- libre
+			cam.CameraSubject = player.Character and player.Character:FindFirstChildOfClass("Humanoid") or nil
+		end
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 0.5
+		player.CameraMaxZoomDistance = 128
+	end)
+end
+
+-- 🧩 Control principal
 local function setupThirdPersonWatcher()
-	local value = player:WaitForChild("ThirdPersonEnabled", 10)
-	if not value then return end
+	local thirdPersonValue = player:WaitForChild("ThirdPersonEnabled", 10)
+	if not thirdPersonValue then return end
 
-	-- 🔸 Esperamos TeacherName para la nueva condición
-	local teacherName = player:FindFirstChild("TeacherName")
-	if not teacherName then
-		player.ChildAdded:Connect(function(child)
-			if child.Name == "TeacherName" then
-				teacherName = child
-			end
-		end)
-	end
+	local teacherName = player:WaitForChild("TeacherName", 10)
+	if not teacherName then return end
 
-	-- 🔍 Función para saber si estamos en AlicePhase2
-	local function isAlicePhase2()
-		return teacherName and teacherName.Value == "AlicePhase2"
-	end
+	local isAlicePhase2 = false
 
-	-- 🔄 Detectar cambios en el atributo TeacherName
-	if teacherName then
-		teacherName.Changed:Connect(function()
-			if not isAlicePhase2() and value.Value then
+	-- 🔄 Actualiza el estado de cámara según TeacherName
+	local function updateCameraMode()
+		isAlicePhase2 = (teacherName.Value == "AlicePhase2")
+		if isAlicePhase2 then
+			releaseCamera()
+		else
+			if thirdPersonValue.Value then
 				task.wait(0.3)
 				applyThirdPerson()
 			end
-		end)
+		end
 	end
 
-	-- 🔄 Si el valor cambia
-	value.Changed:Connect(function()
-		if value.Value and not isAlicePhase2() then
+	-- 📡 Reacciona a cambios de TeacherName
+	teacherName.Changed:Connect(updateCameraMode)
+
+	-- 📡 Reacciona a cambios de ThirdPersonEnabled
+	thirdPersonValue.Changed:Connect(function()
+		if thirdPersonValue.Value and not isAlicePhase2 then
 			task.wait(0.3)
 			applyThirdPerson()
 		end
 	end)
 
-	-- 🔁 Cuando reaparece el jugador
+	-- 📡 Reacciona a reaparecer personaje
 	player.CharacterAdded:Connect(function()
 		task.wait(0.3)
-		if value.Value and not isAlicePhase2() then
+		if thirdPersonValue.Value and not isAlicePhase2 then
 			applyThirdPerson()
+		elseif isAlicePhase2 then
+			releaseCamera()
 		end
 	end)
 
-	-- 🔃 Mantener cámara forzada solo si no es AlicePhase2
+	-- 🔁 Ciclo optimizado de mantenimiento de cámara
 	RunService.RenderStepped:Connect(function()
-		if not value.Value or isAlicePhase2() then return end
+		-- 🚫 Si está en AlicePhase2, no forzamos nada
+		if not thirdPersonValue.Value or isAlicePhase2 then return end
 
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		local char = player.Character
@@ -97,6 +110,9 @@ local function setupThirdPersonWatcher()
 			if player.CameraMaxZoomDistance ~= MAX_ZOOM then player.CameraMaxZoomDistance = MAX_ZOOM end
 		end)
 	end)
+
+	-- Llamada inicial
+	updateCameraMode()
 end
 
 setupThirdPersonWatcher()
