@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local MIN_ZOOM = 4
 local MAX_ZOOM = 4
 
--- ⚙️ Esperar cámara
+-- 🧩 Esperar a que la cámara exista
 local function waitCamera()
 	local cam
 	repeat
@@ -34,51 +34,55 @@ local function applyThirdPerson()
 	end)
 end
 
--- 🎥 Liberar la cámara (sin forzar nada)
-local function releaseCamera()
+-- 🎥 Restaurar cámara predeterminada (modo libre)
+local function restoreDefaultCamera()
 	pcall(function()
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		if cam then
 			cam.CameraType = Enum.CameraType.Custom
 			cam.CameraSubject = player.Character and player.Character:FindFirstChildOfClass("Humanoid") or nil
 		end
+
+		-- 🔁 Volver a la configuración libre
 		player.CameraMode = Enum.CameraMode.Classic
 		player.CameraMinZoomDistance = 0.5
 		player.CameraMaxZoomDistance = 128
 	end)
 end
 
--- 🧠 Obtener el atributo TeacherName desde Workspace.Alices
+-- 🧠 Obtener el atributo TeacherName del modelo del jugador dentro de Workspace.Alices
 local function getTeacherNameAttribute()
 	local folder = Workspace:FindFirstChild("Alices")
 	if not folder then return nil end
-
 	local myModel = folder:FindFirstChild(player.Name)
 	if not myModel then return nil end
-
 	return myModel:FindFirstChild("TeacherName")
 end
 
--- 🧩 Núcleo principal (basado fielmente en tu script original)
+-- 🧩 Núcleo principal
 local function setupThirdPersonWatcher()
 	local value = player:WaitForChild("ThirdPersonEnabled", 10)
 	if not value then return end
 
-	-- 🔍 Buscar el atributo TeacherName dentro del modelo del jugador en Alices
 	local teacherName = getTeacherNameAttribute()
 	local isAlicePhase2 = teacherName and teacherName.Value == "AlicePhase2"
 
-	-- 🔄 Actualizar estado cuando cambie TeacherName
+	-- 🔄 Reacción a los cambios en TeacherName
 	local function updateTeacherState()
 		local newTeacherName = getTeacherNameAttribute()
 		if not newTeacherName then return end
+
 		isAlicePhase2 = (newTeacherName.Value == "AlicePhase2")
 
 		if isAlicePhase2 then
-			releaseCamera()
-		elseif value.Value then
-			task.wait(0.3)
-			applyThirdPerson()
+			-- 🔁 Si somos AlicePhase2, restaurar cámara predeterminada
+			restoreDefaultCamera()
+		else
+			-- 🔁 Si ya no somos AlicePhase2, volver a forzar tercera persona
+			if value.Value then
+				task.wait(0.3)
+				applyThirdPerson()
+			end
 		end
 	end
 
@@ -86,7 +90,7 @@ local function setupThirdPersonWatcher()
 		teacherName:GetPropertyChangedSignal("Value"):Connect(updateTeacherState)
 	end
 
-	-- 🔁 Mismo comportamiento del script original
+	-- 🔁 Activar tercera persona si corresponde
 	value.Changed:Connect(function()
 		if value.Value and not isAlicePhase2 then
 			task.wait(0.3)
@@ -94,29 +98,32 @@ local function setupThirdPersonWatcher()
 		end
 	end)
 
+	-- 🧍‍♂️ Cuando reaparecemos
 	player.CharacterAdded:Connect(function()
 		task.wait(0.3)
-		if value.Value and not isAlicePhase2 then
-			applyThirdPerson()
-		elseif isAlicePhase2 then
-			releaseCamera()
+		if value.Value then
+			if isAlicePhase2 then
+				restoreDefaultCamera()
+			else
+				applyThirdPerson()
+			end
 		end
 	end)
 
-	-- 🔃 Bucle de refuerzo (idéntico al original, con pausa si eres AlicePhase2)
+	-- 🔄 Bucle continuo optimizado
 	RunService.RenderStepped:Connect(function()
 		if not value.Value then return end
-
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		local char = player.Character
 		if not cam or not char then return end
+
 		local humanoid = char:FindFirstChildOfClass("Humanoid")
 		if not humanoid then return end
 
-		-- 🚫 Si eres AlicePhase2 → pausa el forzado temporalmente
+		-- 🚫 Si somos AlicePhase2 → dejar cámara libre
 		if isAlicePhase2 then return end
 
-		-- ✅ Si no eres AlicePhase2 → comportamiento normal del script original
+		-- ✅ Si no lo somos → mantener la cámara forzada (igual que original)
 		pcall(function()
 			if cam.CameraType ~= Enum.CameraType.Custom then cam.CameraType = Enum.CameraType.Custom end
 			if cam.CameraSubject ~= humanoid then cam.CameraSubject = humanoid end
@@ -126,10 +133,14 @@ local function setupThirdPersonWatcher()
 		end)
 	end)
 
-	-- Aplicación inicial
-	if value.Value and not isAlicePhase2 then
-		task.wait(0.3)
-		applyThirdPerson()
+	-- 🧠 Configuración inicial al iniciar el juego
+	if value.Value then
+		if isAlicePhase2 then
+			restoreDefaultCamera()
+		else
+			task.wait(0.3)
+			applyThirdPerson()
+		end
 	end
 end
 
