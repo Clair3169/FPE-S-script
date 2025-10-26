@@ -16,7 +16,7 @@ local function waitCamera()
 	return cam
 end
 
--- Forzar cámara tercera persona (igual a tu original)
+-- Forzar cámara tercera persona
 local function applyThirdPerson()
 	pcall(function()
 		player.CameraMode = Enum.CameraMode.Classic
@@ -34,7 +34,7 @@ local function applyThirdPerson()
 	end)
 end
 
--- 🔍 Obtener atributo TeacherName del modelo dentro de Workspace.Alices
+-- Buscar atributo TeacherName del modelo de Alice
 local function getTeacherNameAttribute()
 	local folder = Workspace:FindFirstChild("Alices")
 	if not folder then return nil end
@@ -48,22 +48,65 @@ local function setupThirdPersonWatcher()
 	local thirdPersonEnabled = player:WaitForChild("ThirdPersonEnabled", 10)
 	if not thirdPersonEnabled then return end
 
-	-- Detectar el atributo TeacherName
-	local teacherNameAttr = getTeacherNameAttribute()
-	local isAlicePhase2 = teacherNameAttr and teacherNameAttr.Value == "AlicePhase2"
+	local isAlicePhase2 = false
+	local teacherConnection -- conexión al atributo TeacherName
+	local modelConnection -- conexión al modelo del jugador
 
-	-- 🔄 Actualizar estado si el atributo cambia
+	-- Función para actualizar estado
 	local function updateTeacherState()
 		local attr = getTeacherNameAttribute()
-		if not attr then return end
+		if not attr then
+			isAlicePhase2 = false
+			return
+		end
 		isAlicePhase2 = (attr.Value == "AlicePhase2")
 	end
 
-	if teacherNameAttr then
-		teacherNameAttr:GetPropertyChangedSignal("Value"):Connect(updateTeacherState)
+	-- 🔄 Escuchar cambios en el modelo dentro de Workspace.Alices
+	local function monitorAliceModel()
+		if modelConnection then
+			modelConnection:Disconnect()
+			modelConnection = nil
+		end
+		if teacherConnection then
+			teacherConnection:Disconnect()
+			teacherConnection = nil
+		end
+
+		local folder = Workspace:WaitForChild("Alices", 5)
+		if not folder then return end
+
+		local function tryAttach()
+			local model = folder:FindFirstChild(player.Name)
+			if not model then return end
+			local teacherAttr = model:FindFirstChild("TeacherName")
+			if teacherAttr then
+				updateTeacherState()
+				teacherConnection = teacherAttr:GetPropertyChangedSignal("Value"):Connect(updateTeacherState)
+			end
+		end
+
+		-- Escuchar cuando aparece o desaparece el modelo
+		modelConnection = folder.ChildAdded:Connect(function(child)
+			if child.Name == player.Name then
+				task.wait(0.2)
+				tryAttach()
+			end
+		end)
+
+		folder.ChildRemoved:Connect(function(child)
+			if child.Name == player.Name then
+				isAlicePhase2 = false
+			end
+		end)
+
+		-- Intentar conectar si ya existe
+		tryAttach()
 	end
 
-	-- 🔁 Cuando se activa ThirdPersonEnabled
+	monitorAliceModel()
+
+	-- 🔁 Cuando cambia ThirdPersonEnabled
 	thirdPersonEnabled.Changed:Connect(function()
 		if thirdPersonEnabled.Value and not isAlicePhase2 then
 			task.wait(0.3)
@@ -79,10 +122,10 @@ local function setupThirdPersonWatcher()
 		end
 	end)
 
-	-- 🔄 Bucle constante que fuerza la cámara SOLO si no somos AlicePhase2
+	-- 🔄 Bucle constante
 	RunService.RenderStepped:Connect(function()
 		if not thirdPersonEnabled.Value then return end
-		if isAlicePhase2 then return end -- 🚫 Si somos AlicePhase2, NO hacer nada
+		if isAlicePhase2 then return end -- 🚫 respetar AlicePhase2
 
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		local char = player.Character
