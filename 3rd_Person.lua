@@ -33,28 +33,63 @@ local function applyThirdPerson()
 end
 
 local function setupThirdPersonWatcher()
-	local value = player:WaitForChild("ThirdPersonEnabled", 10)
-	if not value then return end
+	local thirdPersonEnabled = player:WaitForChild("ThirdPersonEnabled", 10)
+	local teacherName = player:WaitForChild("TeacherName", 10)
+	if not thirdPersonEnabled then return end
+	if not teacherName then return end
 
-	value.Changed:Connect(function()
-		if value.Value then
+	local function isAlicePhase2()
+		return teacherName.Value == "AlicePhase2"
+	end
+
+	local function updateCameraBehavior()
+		if isAlicePhase2() then
+			-- 🔸 Dejar la cámara libre (sin forzar nada)
+			pcall(function()
+				local cam = Workspace:FindFirstChildOfClass("Camera")
+				if cam then
+					cam.CameraType = Enum.CameraType.Custom
+					player.CameraMode = Enum.CameraMode.Classic
+					player.CameraMinZoomDistance = 0.5
+					player.CameraMaxZoomDistance = 128
+				end
+			end)
+		else
+			-- 🔸 Comportamiento normal (forzar cámara 3ra persona)
+			if thirdPersonEnabled.Value then
+				task.wait(0.3)
+				applyThirdPerson()
+			end
+		end
+	end
+
+	-- Detectar cambios en TeacherName
+	teacherName.Changed:Connect(updateCameraBehavior)
+
+	-- Detectar cambios en ThirdPersonEnabled
+	thirdPersonEnabled.Changed:Connect(function()
+		if thirdPersonEnabled.Value and not isAlicePhase2() then
 			task.wait(0.3)
 			applyThirdPerson()
 		end
 	end)
 
+	-- Cuando reaparezca el jugador
 	player.CharacterAdded:Connect(function()
 		task.wait(0.3)
-		if value.Value then
+		if thirdPersonEnabled.Value and not isAlicePhase2() then
 			applyThirdPerson()
 		end
 	end)
 
+	-- RenderStepped loop optimizado
 	RunService.RenderStepped:Connect(function()
-		if not value.Value then return end
+		if not thirdPersonEnabled.Value or isAlicePhase2() then return end
+
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		local char = player.Character
 		if not cam or not char then return end
+
 		local humanoid = char:FindFirstChildOfClass("Humanoid")
 		pcall(function()
 			if cam.CameraType ~= Enum.CameraType.Custom then cam.CameraType = Enum.CameraType.Custom end
@@ -64,6 +99,9 @@ local function setupThirdPersonWatcher()
 			if player.CameraMaxZoomDistance ~= MAX_ZOOM then player.CameraMaxZoomDistance = MAX_ZOOM end
 		end)
 	end)
+
+	-- Llamada inicial
+	updateCameraBehavior()
 end
 
 setupThirdPersonWatcher()
