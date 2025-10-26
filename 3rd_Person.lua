@@ -16,7 +16,7 @@ local function waitCamera()
 	return cam
 end
 
--- 🎥 Forzar cámara en tercera persona (idéntico a tu original)
+-- 🎥 Forzar cámara en tercera persona (igual al original)
 local function applyThirdPerson()
 	pcall(function()
 		player.CameraMode = Enum.CameraMode.Classic
@@ -34,8 +34,8 @@ local function applyThirdPerson()
 	end)
 end
 
--- 🎥 Restaurar cámara predeterminada (modo libre)
-local function restoreDefaultCamera()
+-- 🎥 Activar modo primera persona bloqueada (para AlicePhase2)
+local function applyFirstPersonLock()
 	pcall(function()
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		if cam then
@@ -43,14 +43,13 @@ local function restoreDefaultCamera()
 			cam.CameraSubject = player.Character and player.Character:FindFirstChildOfClass("Humanoid") or nil
 		end
 
-		-- 🔁 Volver a la configuración libre
-		player.CameraMode = Enum.CameraMode.Classic
-		player.CameraMinZoomDistance = 0.5
-		player.CameraMaxZoomDistance = 128
+		player.CameraMode = Enum.CameraMode.LockFirstPerson
+		player.CameraMinZoomDistance = 0
+		player.CameraMaxZoomDistance = 0
 	end)
 end
 
--- 🧠 Obtener el atributo TeacherName del modelo del jugador dentro de Workspace.Alices
+-- 🧠 Obtener atributo TeacherName dentro de Workspace.Alices
 local function getTeacherNameAttribute()
 	local folder = Workspace:FindFirstChild("Alices")
 	if not folder then return nil end
@@ -67,18 +66,15 @@ local function setupThirdPersonWatcher()
 	local teacherName = getTeacherNameAttribute()
 	local isAlicePhase2 = teacherName and teacherName.Value == "AlicePhase2"
 
-	-- 🔄 Reacción a los cambios en TeacherName
+	-- 🔄 Reacción a cambios del atributo TeacherName
 	local function updateTeacherState()
 		local newTeacherName = getTeacherNameAttribute()
 		if not newTeacherName then return end
-
 		isAlicePhase2 = (newTeacherName.Value == "AlicePhase2")
 
 		if isAlicePhase2 then
-			-- 🔁 Si somos AlicePhase2, restaurar cámara predeterminada
-			restoreDefaultCamera()
+			applyFirstPersonLock()
 		else
-			-- 🔁 Si ya no somos AlicePhase2, volver a forzar tercera persona
 			if value.Value then
 				task.wait(0.3)
 				applyThirdPerson()
@@ -90,20 +86,24 @@ local function setupThirdPersonWatcher()
 		teacherName:GetPropertyChangedSignal("Value"):Connect(updateTeacherState)
 	end
 
-	-- 🔁 Activar tercera persona si corresponde
+	-- 🔁 Cuando el valor de ThirdPersonEnabled cambia
 	value.Changed:Connect(function()
-		if value.Value and not isAlicePhase2 then
-			task.wait(0.3)
-			applyThirdPerson()
+		if value.Value then
+			if isAlicePhase2 then
+				applyFirstPersonLock()
+			else
+				task.wait(0.3)
+				applyThirdPerson()
+			end
 		end
 	end)
 
-	-- 🧍‍♂️ Cuando reaparecemos
+	-- 🧍‍♂️ Cuando el jugador reaparece
 	player.CharacterAdded:Connect(function()
 		task.wait(0.3)
 		if value.Value then
 			if isAlicePhase2 then
-				restoreDefaultCamera()
+				applyFirstPersonLock()
 			else
 				applyThirdPerson()
 			end
@@ -116,14 +116,13 @@ local function setupThirdPersonWatcher()
 		local cam = Workspace:FindFirstChildOfClass("Camera")
 		local char = player.Character
 		if not cam or not char then return end
-
 		local humanoid = char:FindFirstChildOfClass("Humanoid")
 		if not humanoid then return end
 
-		-- 🚫 Si somos AlicePhase2 → dejar cámara libre
+		-- 🚫 Si somos AlicePhase2, no forzar nada (ya estamos en primera persona)
 		if isAlicePhase2 then return end
 
-		-- ✅ Si no lo somos → mantener la cámara forzada (igual que original)
+		-- ✅ Si no somos AlicePhase2, forzar cámara como en el original
 		pcall(function()
 			if cam.CameraType ~= Enum.CameraType.Custom then cam.CameraType = Enum.CameraType.Custom end
 			if cam.CameraSubject ~= humanoid then cam.CameraSubject = humanoid end
@@ -133,10 +132,10 @@ local function setupThirdPersonWatcher()
 		end)
 	end)
 
-	-- 🧠 Configuración inicial al iniciar el juego
+	-- 🔧 Configuración inicial al entrar en el juego
 	if value.Value then
 		if isAlicePhase2 then
-			restoreDefaultCamera()
+			applyFirstPersonLock()
 		else
 			task.wait(0.3)
 			applyThirdPerson()
