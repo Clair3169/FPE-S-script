@@ -4,60 +4,55 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
+
 local MIN_ZOOM = 4
 local MAX_ZOOM = 4
 
--- 🔹 Variables de control
+-- Estado
 local isAlicePhase2 = false
-local thirdPersonEnabled = true -- Asúmelo activo mientras lo pruebas
+local thirdPersonEnabled = true -- ajusta según tu sistema real
 
--- 🔸 Forzar tercera persona (independiente del PlayerModule)
+-- 🟩 Forzar cámara en tercera persona (solo cuando NO somos AlicePhase2)
 local function forceThirdPerson()
 	local character = player.Character
 	if not character then return end
-
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
-
-	camera.CameraType = Enum.CameraType.Custom
-	camera.CameraSubject = humanoid
-	player.CameraMode = Enum.CameraMode.Classic
-	player.CameraMinZoomDistance = MIN_ZOOM
-	player.CameraMaxZoomDistance = MAX_ZOOM
+	
+		camera.CameraType = Enum.CameraType.Custom
+		camera.CameraSubject = humanoid
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = MIN_ZOOM
+		player.CameraMaxZoomDistance = MAX_ZOOM
 end
 
--- 🔸 Liberar cámara (para AlicePhase2)
-local function releaseCamera()
-	camera.CameraType = Enum.CameraType.Scriptable
-	camera.CameraSubject = nil
-	player.CameraMinZoomDistance = 0.5
-	player.CameraMaxZoomDistance = 128
-end
-
--- 🔹 Detectar si el jugador es AlicePhase2
+-- 🔍 Detección del estado AlicePhase2
 local function updateAliceState()
 	local folder = Workspace:FindFirstChild("Alices")
-	if not folder then return end
+	if not folder then
+		isAlicePhase2 = false
+		return
+	end
+
 	local model = folder:FindFirstChild(player.Name)
-	if not model then return end
+	if not model then
+		isAlicePhase2 = false
+		return
+	end
 
-	local attr = model:FindFirstChild("TeacherName")
-	if not attr then return end
-
-	isAlicePhase2 = (attr.Value == "AlicePhase2")
+	local attrValue = model:GetAttribute("TeacherName")
+	isAlicePhase2 = (attrValue == "AlicePhase2")
 end
 
--- 🔁 Ciclo continuo para forzar o liberar cámara
-RunService.Heartbeat:Connect(function()
-	updateAliceState()
+-- 🔁 Actualización periódica (sin sobrecargar)
+task.spawn(function()
+	while true do
+		updateAliceState()
 
-	if not thirdPersonEnabled then return end
+		if thirdPersonEnabled and not isAlicePhase2 then
+			forceThirdPerson()
+		end
 
-	if isAlicePhase2 then
-		releaseCamera()
-	else
-		forceThirdPerson()
+		task.wait(0.5)
 	end
 end)
-
-print("✅ Cámara personalizada activa para scripts ejecutados en juego.")
