@@ -1,4 +1,4 @@
--- 🟢 Student Highlighter System (Cache persistente + Pre-generado + Sin interferencias)
+-- 🟢 Student Highlighter, Teachers System (Cache persistente + Optimizado + Sin dependencias de cabeza)
 repeat task.wait() until game:IsLoaded()
 
 -- ⚙️ Servicios
@@ -30,12 +30,28 @@ highlightCache.Name = "HighlightCache_Students"
 highlightCache.Parent = Workspace
 
 ------------------------------------------------------------
+-- 🧩 Fallback seguro para obtener posición del modelo
+------------------------------------------------------------
+local function getModelPosition(model)
+	if not model or not model:IsA("Model") then return nil end
+	if model.PrimaryPart then
+		return model.PrimaryPart.Position
+	end
+	-- fallback: tomar la primera parte válida
+	for _, part in ipairs(model:GetChildren()) do
+		if part:IsA("BasePart") then
+			return part.Position
+		end
+	end
+	return nil
+end
+
+------------------------------------------------------------
 -- 🧩 Función: Crear o recuperar Highlight de cache
 ------------------------------------------------------------
 local function getOrCreateHighlight(character)
 	if not character or not character:IsA("Model") then return end
 
-	-- Si ya existe activo, devolverlo
 	if activeHighlights[character] then
 		return activeHighlights[character]
 	end
@@ -43,7 +59,6 @@ local function getOrCreateHighlight(character)
 	local cacheName = character.Name .. "_HL_Student"
 	local cached = highlightCache:FindFirstChild(cacheName)
 
-	-- Si ya existe en cache → solo reasignar
 	if cached and cached:IsA("Highlight") then
 		cached.Adornee = character
 		cached.Enabled = false
@@ -51,11 +66,10 @@ local function getOrCreateHighlight(character)
 		return cached
 	end
 
-	-- Crear nuevo y almacenar en cache
 	local highlight = Instance.new("Highlight")
 	highlight.Name = cacheName
 	highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
-	highlight.FillTransparency = 1
+	highlight.FillTransparency = 0.85 -- un poco visible
 	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
 	highlight.Adornee = character
@@ -77,57 +91,30 @@ task.defer(function()
 end)
 
 ------------------------------------------------------------
--- 🧩 Verificar prioridad de Highlight
-------------------------------------------------------------
-local function checkHighlightPriority(character)
-	local highlight = activeHighlights[character]
-	if not highlight then return end
-
-	-- Si hay otro Highlight activo en el mismo modelo
-	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Highlight") and child ~= highlight and child.Enabled then
-			highlight.Enabled = false
-			return
-		end
-	end
-
-	-- Si no hay otro activo, mostrar el nuestro
-	highlight.Enabled = true
-end
-
-------------------------------------------------------------
--- 🧩 Activar/Desactivar Highlight según visibilidad
+-- 🧩 Activar/Desactivar Highlight
 ------------------------------------------------------------
 local function updateHighlightState(character, state)
 	local highlight = getOrCreateHighlight(character)
 	if not highlight then return end
-
-	if state then
-		highlight.Adornee = character
-		highlight.Enabled = true
-		checkHighlightPriority(character)
-	else
-		highlight.Enabled = false
-		highlight.Adornee = character
-	end
+	highlight.Enabled = state
+	highlight.Adornee = character
 end
 
 ------------------------------------------------------------
--- 🧩 Visibilidad de los más cercanos
+-- 🧩 Actualizar lista de visibles por distancia
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
 
-	local localHead = localPlayer.Character:FindFirstChild("Head")
-	if not localHead then return end
-	local localPos = localHead.Position
+	local localPos = getModelPosition(localPlayer.Character)
+	if not localPos then return end
 
 	local distances = {}
 	for _, student in ipairs(studentsFolder:GetChildren()) do
 		if student ~= localPlayer.Character and student:IsA("Model") then
-			local head = student:FindFirstChild("Head")
-			if head then
-				local dist = (localPos - head.Position).Magnitude
+			local targetPos = getModelPosition(student)
+			if targetPos then
+				local dist = (localPos - targetPos).Magnitude
 				if dist <= MAX_DISTANCE then
 					table.insert(distances, {student, dist})
 				end
@@ -155,8 +142,6 @@ local function updateVisibleStudents()
 	for student in pairs(newVisible) do
 		if not visibleStudents[student] then
 			updateHighlightState(student, true)
-		else
-			checkHighlightPriority(student)
 		end
 	end
 
@@ -197,7 +182,7 @@ end
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if child:IsA("Model") and child ~= localPlayer.Character then
-		getOrCreateHighlight(child) -- Preasignado y desactivado
+		getOrCreateHighlight(child)
 		if systemActive then
 			task.defer(updateVisibleStudents)
 		end
@@ -230,16 +215,15 @@ end
 localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
 ------------------------------------------------------------
--- ♻️ OPTIMIZACIÓN: actualización inteligente por movimiento
+-- ♻️ OPTIMIZACIÓN: actualización por movimiento
 ------------------------------------------------------------
 task.spawn(function()
 	local lastPos = Vector3.zero
 	while RunService.Heartbeat:Wait() do
 		if not systemActive or not localPlayer.Character then continue end
-		local head = localPlayer.Character:FindFirstChild("Head")
-		if not head then continue end
+		local pos = getModelPosition(localPlayer.Character)
+		if not pos then continue end
 
-		local pos = head.Position
 		if (pos - lastPos).Magnitude > UPDATE_THRESHOLD then
 			lastPos = pos
 			updateVisibleStudents()
