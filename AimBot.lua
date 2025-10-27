@@ -21,16 +21,11 @@ local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-local currentTarget = nil
-local currentMode = nil
 local circleActive = false
 
 -- Reutilizar RaycastParams para evitar asignaciones por cada comprobación
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
--- Cache de carpetas (puede actualizarse si falta alguna)
-local function getFolder(name) return Workspace:FindFirstChild(name) end
 
 -- Actualizar cámara si se reinicia
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
@@ -96,22 +91,22 @@ local function getTargetPartByPriority(model, priorityList)
     return nil
 end
 
+-- Apunta la cámara exactamente al centro del target (independiente de shiftlock / offsets)
 local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera then return end
+    if not targetPart or not Workspace.CurrentCamera then return end
+    if not LocalPlayer or not LocalPlayer.Character then return end
 
-	local cam = Workspace.CurrentCamera
-	local char = LocalPlayer.Character
-	if not char then return end
+    local cam = Workspace.CurrentCamera
 
-	-- Obtiene posición base del jugador (cerca del cuello o torso)
-	local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-	if not root then return end
+    -- Calcula el centro del target (ajusta si quieres más/menos offset vertical)
+    local targetPos = targetPart.Position
+    -- Si la parte tiene tamaño, centra un poco verticalmente (opcional)
+    if targetPart:IsA("BasePart") then
+        targetPos = targetPos + Vector3.new(0, targetPart.Size.Y * 0.0, 0)
+    end
 
-	-- Apunta desde el jugador directamente hacia el centro del target (no desde la cámara)
-	local origin = root.Position + Vector3.new(0, 1.5, 0)
-	local targetPos = targetPart.Position + Vector3.new(0, targetPart.Size.Y * 0.25, 0)
-
-	cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
+    -- Forzamos la cámara a mirar exactamente al centro del objetivo (desde la cámara actual)
+    cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
 end
 
 local function isTimerVisible()
@@ -186,17 +181,22 @@ local function bindCircleDetection(char)
     clearCharConnections()
     circleActive = checkCircleConditions(char)
 
+    if not char then return end
+
     -- Detectar cambios en atributos del Character
-    local attrConn = char:GetAttributeChangedSignal("TeacherName"):Connect(function()
-        circleActive = checkCircleConditions(char)
+    pcall(function()
+        table.insert(charConnections, char:GetAttributeChangedSignal("TeacherName"):Connect(function()
+            circleActive = checkCircleConditions(char)
+        end))
     end)
-    table.insert(charConnections, attrConn)
 
     -- Detectar si el Character cambia de carpeta (Teachers u otra)
-    local parentConn = char:GetPropertyChangedSignal("Parent"):Connect(function()
-        circleActive = checkCircleConditions(char)
+    local ok, parentConn = pcall(function()
+        return char:GetPropertyChangedSignal("Parent"):Connect(function()
+            circleActive = checkCircleConditions(char)
+        end)
     end)
-    table.insert(charConnections, parentConn)
+    if ok and parentConn then table.insert(charConnections, parentConn) end
 
     -- Detectar cambios dentro del Humanoid (aparición/desaparición de SprintLock)
     local humanoid = char:FindFirstChild("Humanoid")
@@ -301,109 +301,148 @@ local function chooseTarget(models, parts)
 end
 
 -- =====================================================
--- 🔁 LOOP PRINCIPAL (actualiza e intenta apuntar cada frame)
--- =====================================================
--- 🧠 Activación / desactivación total del Aimbot
+-- 🔁 CONTROL DE ACTIVACIÓN / DESACTIVACIÓN TOTAL DEL AIMBOT
 -- =====================================================
 
 local aimbotConnection = nil
+local activationConns = {}
 
 -- Comprueba si el jugador cumple algún requisito de modo
 local function isEligible()
-	local char = LocalPlayer.Character
-	if not char then return false end
+    local char = LocalPlayer.Character
+    if not char then return false end
 
-	local teacher = char:GetAttribute("TeacherName")
-	local hasBook = hasLibraryBook(char)
-	local humanoid = char:FindFirstChild("Humanoid")
-	local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
+    local teacher = char:GetAttribute("TeacherName")
+    local hasBook = hasLibraryBook(char)
+    local humanoid = char:FindFirstChild("Humanoid")
+    local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
 
-	if (char.Parent and char.Parent.Name == "Students" and hasBook) then
-		return true
-	elseif (teacher == "Thavel" and char:GetAttribute("Charging") == true) then
-		return true
-	elseif (teacher == "Circle" and sprintLock) then
-		return true
-	elseif (teacher == "Bloomie" and char:GetAttribute("Aiming") == true) then
-		return true
-	end
-	return false
+    if (char.Parent and char.Parent.Name == "Students" and hasBook) then
+        return true
+    elseif (teacher == "Thavel" and char:GetAttribute("Charging") == true) then
+        return true
+    elseif (teacher == "Circle" and sprintLock) then
+        return true
+    elseif (teacher == "Bloomie" and char:GetAttribute("Aiming") == true) then
+        return true
+    end
+    return false
 end
 
--- Función principal del Aimbot (idéntica a tu loop anterior)
+-- Función principal del Aimbot (loop por frame)
 local function runAimbot()
-	if aimbotConnection then aimbotConnection:Disconnect() end
+    if aimbotConnection then aimbotConnection:Disconnect() end
 
-	aimbotConnection = RunService.RenderStepped:Connect(function()
-		if not isEligible() then
-			if aimbotConnection then
-				aimbotConnection:Disconnect()
-				aimbotConnection = nil
-			end
-			return
-		end
+    aimbotConnection = RunService.RenderStepped:Connect(function()
+        if not isEligible() then
+            if aimbotConnection then
+                aimbotConnection:Disconnect()
+                aimbotConnection = nil
+            end
+            return
+        end
 
-		local char = LocalPlayer.Character
-		if not char then return end
+        local char = LocalPlayer.Character
+        if not char then return end
 
-		local lib = getLibraryBookTargets()
-		local thavel = getThavelTargets()
-		local circle = getCircleTargets()
-		local bloomie = getBloomieTargets()
+        -- Optimización: chequeo rápido de atributos para evitar cálculos innecesarios
+        local teacher = char:GetAttribute("TeacherName")
+        local hasBook = hasLibraryBook(char)
+        local humanoid = char:FindFirstChild("Humanoid")
+        local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
 
-		local currentTarget, currentMode = nil, nil
+        -- Si claramente no cumple modos, salimos rápido (esto reduce trabajo cerca de muchos players)
+        if not (hasBook or (teacher == "Thavel" and char:GetAttribute("Charging") == true) or (teacher == "Circle" and sprintLock) or (teacher == "Bloomie" and char:GetAttribute("Aiming") == true)) then
+            return
+        end
 
-		if #lib > 0 then
-			currentTarget = chooseTarget(lib, AIM_PARTS.LibraryBook)
-			currentMode = "LibraryBook"
-		elseif #thavel > 0 then
-			currentTarget = chooseTarget(thavel, AIM_PARTS.Thavel)
-			currentMode = "Thavel"
-		elseif #circle > 0 then
-			currentTarget = chooseTarget(circle, AIM_PARTS.Circle)
-			currentMode = "Circle"
-		elseif #bloomie > 0 then
-			currentTarget = chooseTarget(bloomie, AIM_PARTS.Bloomie)
-			currentMode = "Bloomie"
-		end
+        local lib = getLibraryBookTargets()
+        local thavel = getThavelTargets()
+        local circle = getCircleTargets()
+        local bloomie = getBloomieTargets()
 
-		if currentTarget and currentMode then
-			local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
-			if part then
-				lockCameraToTargetPart(part)
-			end
-		end
-	end)
+        local currentTarget, currentMode = nil, nil
+
+        if #lib > 0 then
+            currentTarget = chooseTarget(lib, AIM_PARTS.LibraryBook)
+            currentMode = "LibraryBook"
+        elseif #thavel > 0 then
+            currentTarget = chooseTarget(thavel, AIM_PARTS.Thavel)
+            currentMode = "Thavel"
+        elseif #circle > 0 then
+            currentTarget = chooseTarget(circle, AIM_PARTS.Circle)
+            currentMode = "Circle"
+        elseif #bloomie > 0 then
+            currentTarget = chooseTarget(bloomie, AIM_PARTS.Bloomie)
+            currentMode = "Bloomie"
+        end
+
+        if currentTarget and currentMode then
+            local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
+            if part then
+                lockCameraToTargetPart(part)
+            end
+        end
+    end)
 end
 
 -- =====================================================
 -- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
 -- =====================================================
 
+local function clearActivationConns()
+    for _, c in ipairs(activationConns) do
+        if c and c.Disconnect then
+            pcall(function() c:Disconnect() end)
+        end
+    end
+    activationConns = {}
+end
+
 local function bindAutoActivation()
-	local function checkAndRun()
-		if not aimbotConnection and isEligible() then
-			runAimbot()
-		end
-	end
+    clearActivationConns()
 
-	-- Escuchar eventos clave
-	local char = LocalPlayer.Character
-	if not char then return end
+    local function checkAndRun()
+        if not aimbotConnection and isEligible() then
+            runAimbot()
+        end
+    end
 
-	char.AttributeChanged:Connect(checkAndRun)
-	char.ChildAdded:Connect(checkAndRun)
-	char.ChildRemoved:Connect(checkAndRun)
+    -- Escuchar eventos clave del Character y del Player
+    local function bindForChar(char)
+        if not char then return end
+        table.insert(activationConns, char:GetAttributeChangedSignal("TeacherName"):Connect(checkAndRun))
+        table.insert(activationConns, char.ChildAdded:Connect(checkAndRun))
+        table.insert(activationConns, char.ChildRemoved:Connect(checkAndRun))
+        -- Atributos que pueden cambiar en el personaje (Charging, Aiming)
+        table.insert(activationConns, char:GetAttributeChangedSignal("Charging"):Connect(checkAndRun))
+        table.insert(activationConns, char:GetAttributeChangedSignal("Aiming"):Connect(checkAndRun))
+    end
 
-	-- Arranque inicial
-	checkAndRun()
+    if LocalPlayer.Character then
+        bindForChar(LocalPlayer.Character)
+    end
+
+    table.insert(activationConns, LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        bindForChar(char)
+        checkAndRun()
+    end))
+
+    table.insert(activationConns, LocalPlayer.CharacterRemoving:Connect(function()
+        clearActivationConns()
+        if aimbotConnection then
+            aimbotConnection:Disconnect()
+            aimbotConnection = nil
+        end
+    end))
+
+    -- Comprobación inicial
+    checkAndRun()
 end
 
-if LocalPlayer.Character then
-	bindAutoActivation()
+if LocalPlayer then
+    bindAutoActivation()
 end
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-	task.wait(1)
-	bindAutoActivation()
-end)
+-- Fin del script
