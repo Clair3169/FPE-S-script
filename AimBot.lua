@@ -297,6 +297,24 @@ RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
 
+        -- 💤 Reposo inteligente: si no se cumple ninguno de los 4 modos, se suspende hasta que sí
+local function hasAnyModeActive()
+	local char = LocalPlayer.Character
+	if not char then return false end
+	return (
+		(#getLibraryBookTargets() > 0)
+		or (#getThavelTargets() > 0)
+		or (#getCircleTargets() > 0)
+		or (#getBloomieTargets() > 0)
+	)
+end
+
+if not hasAnyModeActive() then
+	repeat
+		task.wait(0.2)
+	until hasAnyModeActive()
+        end
+
     -- reset relativo y selección inmediata cada frame
     currentTarget, currentMode = nil, nil
 
