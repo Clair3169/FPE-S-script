@@ -114,10 +114,6 @@ local function lockCameraToTargetPart(targetPart)
 	cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
 end
 
-	-- Fallback normal (modo sin shiftlock)
-	cam.CFrame = CFrame.lookAt(camPos, targetPart.Position)
-end
-
 local function isTimerVisible()
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if not pg then return false end
