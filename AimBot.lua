@@ -89,35 +89,26 @@ local function getTargetPartByPriority(model, priorityList)
 	return nil
 end
 
--- Esta función es CORRECTA. El problema no está aquí.
--- Rota la cámara sin moverla de su posición (hombro).
+-- =====================================================
+-- 🔒 FUNCIÓN DE CÁMARA (CORREGIDA - MÉTODO AGRESIVO)
+-- =====================================================
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
 	
-	-- 1. Obtenemos el rayo que sale del CENTRO de tu pantalla
-	local viewportCenter = cam.ViewportSize / 2
-	local centerRay = cam:ScreenPointToRay(viewportCenter.X, viewportCenter.Y)
-
-	-- 2. 'eyePos' es la posición física de la cámara (el hombro)
-	local eyePos = centerRay.Origin 
+	-- 1. Obtenemos la posición actual de la cámara (el "hombro" o eyePos)
+	--    Esto es crucial. Lo leemos DESPUÉS de que el script del juego lo haya movido.
+	local eyePos = cam.CFrame.Position 
 	
-	-- 3. 'currentLook' es la dirección a la que MIRA el centro de tu pantalla
-	local currentLook = centerRay.Direction 
-
-	-- 4. 'desiredLook' es la dirección a la que DEBERÍA mirar la cámara
-	-- (la dirección desde el hombro hasta el objetivo)
-	local desiredLook = (targetPos - eyePos).Unit
-
-	-- 5. CALCULAMOS LA ROTACIÓN 'DELTA' (LA DIFERENCIA)
-	local deltaRotation = CFrame.new(Vector3.new(), desiredLook) * CFrame.new(Vector3.new(), currentLook):Inverse()
-
-	-- 6. APLICAMOS LA ROTACIÓN
-	-- Esto ROTA la cámara sin moverla de sitio.
-	cam.CFrame = cam.CFrame * deltaRotation
+	-- 2. FORZAMOS el CFrame
+	--    Le decimos a la cámara: "Quédate en esta posición (eyePos),
+	--    pero mira EXACTAMENTE a esta otra posición (targetPos)".
+	--    Esto es más directo y anula cualquier cálculo anterior.
+	cam.CFrame = CFrame.lookAt(eyePos, targetPos)
 end
+
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
@@ -136,7 +127,9 @@ end
 -- =====================================================
 -- 🧠 MODOS (LibraryBook / Thavel / Bloomie / Circle)
 -- =====================================================
-
+-- (Todo el código de getLibraryBookTargets, getThavelTargets, bindCircleDetection, etc. va aquí)
+-- (Es idéntico al script anterior, no es necesario copiarlo si solo cambias la función de cámara)
+-- ...
 local function getLibraryBookTargets()
 	local models = {}
 	local char = LocalPlayer and LocalPlayer.Character
@@ -261,6 +254,8 @@ local function getBloomieTargets()
 	end
 	return models
 end
+-- ... (Fin de la sección de modos)
+
 
 -- =====================================================
 -- 🎯 SELECCIÓN DE OBJETIVO (optimizada)
@@ -309,7 +304,7 @@ local function chooseTarget(models, parts)
 end
 
 -- =====================================================
--- 🧠 Activación / desactivación total del Aimbot (CORREGIDO)
+-- 🧠 Activación / desactivación total del Aimbot (BindToRenderStep)
 -- =====================================================
 
 local isAimbotRunning = false
@@ -395,8 +390,8 @@ local function runAimbot()
 	isAimbotRunning = true
 	
 	-- Bindeamos la función para que se ejecute DESPUÉS de la cámara
-	-- El script de cámara de Roblox corre en prioridad 200. Usamos 201.
-	local camPriority = Enum.RenderPriority.Camera.Value + 1
+	-- Usa .Last.Value (2000) para máxima prioridad
+	local camPriority = Enum.RenderPriority.Last.Value
 	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
 end
 
