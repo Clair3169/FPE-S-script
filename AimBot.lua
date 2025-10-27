@@ -94,13 +94,30 @@ local function lockCameraToTargetPart(targetPart)
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
-	local camPos = cam.CFrame.Position -- Obtenemos la posición actual de la cámara
 
-	-- ✅ ESTA ES LA CORRECCIÓN:
-	-- Usamos CFrame.lookAt() para crear un CFrame en la posición actual de la cámara
-	-- (camPos) que mire directamente a la posición del objetivo (targetPos).
-	-- Es mucho más estable y simple que calcular la matriz manualmente.
-	cam.CFrame = CFrame.lookAt(camPos, targetPos)
+	-- 1. Obtenemos la POSICIÓN FÍSICA actual de la cámara (ej. en el hombro)
+	local camPos = cam.CFrame.Position
+
+	-- 2. Obtenemos la POSICIÓN REAL DE LA VISTA (el "ojo" o centro de la pantalla)
+	-- Esto es crucial para corregir el parallax del ShiftLock.
+	local viewportCenter = cam.ViewportSize / 2
+	local centerRay = cam:ScreenPointToRay(viewportCenter.X, viewportCenter.Y)
+	
+	-- El 'eyePosition' es el verdadero punto de origen de tu mira
+	local eyePosition = centerRay.Origin
+
+	-- 3. Calculamos el vector de mirada (dirección)
+	-- Se calcula desde el OJO (eyePosition) al objetivo (targetPos)
+	local newLookVector = (targetPos - eyePosition).Unit
+
+	-- 4. Creamos el punto al que la cámara debe mirar
+	-- Le decimos a la cámara física (camPos) que mire en la dirección correcta (newLookVector)
+	local newLookAtPoint = camPos + newLookVector
+
+	-- 5. Aplicamos el CFrame
+	-- La cámara se queda en su posición (camPos), 
+	-- pero ahora apunta a 'newLookAtPoint', forzando la rotación correcta.
+	cam.CFrame = CFrame.lookAt(camPos, newLookAtPoint)
 end
 
 local function isTimerVisible()
