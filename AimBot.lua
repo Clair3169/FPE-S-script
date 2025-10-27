@@ -94,15 +94,13 @@ local function lockCameraToTargetPart(targetPart)
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
+	local camPos = cam.CFrame.Position -- Obtenemos la posición actual de la cámara
 
-	-- ✅ En lugar de mover la cámara completa, solo cambiamos su orientación (manteniendo el mouse centrado)
-	local camCFrame = cam.CFrame
-	local newLook = (targetPos - camCFrame.Position).Unit
-	local _, _, _, r00, r01, r02, r10, r11, r12, r20, r21, r22 = camCFrame:GetComponents()
-	local right = Vector3.new(r00, r10, r20)
-	local up = right:Cross(newLook).Unit:Cross(right).Unit
-
-	cam.CFrame = CFrame.fromMatrix(camCFrame.Position, right, up, -newLook)
+	-- ✅ ESTA ES LA CORRECCIÓN:
+	-- Usamos CFrame.lookAt() para crear un CFrame en la posición actual de la cámara
+	-- (camPos) que mire directamente a la posición del objetivo (targetPos).
+	-- Es mucho más estable y simple que calcular la matriz manualmente.
+	cam.CFrame = CFrame.lookAt(camPos, targetPos)
 end
 
 local function isTimerVisible()
