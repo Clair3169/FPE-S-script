@@ -1,6 +1,6 @@
 -- =====================================================
 -- 🎯 Aimbot combinado optimizado (LibraryBook / Thavel / Circle / Bloomie)
--- Actualización inmediata por frame y micro-optimización para FPS
+-- Activación/desactivación completa y apuntado al centro del objetivo
 -- =====================================================
 
 local AIM_PARTS = {
@@ -74,15 +74,13 @@ local function getModelsFromFolders(folderList)
     return models
 end
 
--- Obtiene la parte objetivo, revisando prioridades
+-- Obtiene la parte objetivo, revisando prioridades (intento directo + fallback recursivo)
 local function getTargetPartByPriority(model, priorityList)
     for _, name in ipairs(priorityList) do
-        -- Primero intento directo (no recursivo) para ser más rápido
         local part = model:FindFirstChild(name)
         if part and part:IsA("BasePart") then
             return part
         end
-        -- Si no existe, chequeo recursivo como fallback (más lento)
         part = model:FindFirstChild(name, true)
         if part and part:IsA("BasePart") then
             return part
@@ -91,26 +89,39 @@ local function getTargetPartByPriority(model, priorityList)
     return nil
 end
 
--- Apunta la cámara exactamente al centro del target (independiente de shiftlock / offsets)
+-- Apunta la cámara de manera que el centro del target quede centrado en el crosshair
+-- Ignora offsets laterales: apuntado directo al centro del objetivo
 local function lockCameraToTargetPart(targetPart)
     if not targetPart or not Workspace.CurrentCamera then return end
-    if not LocalPlayer or not LocalPlayer.Character then return end
-
     local cam = Workspace.CurrentCamera
+    local char = LocalPlayer and LocalPlayer.Character
+    if not char then
+        -- fallback si no hay character: apuntar desde la cámara hacia la parte
+        cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPart.Position)
+        return
+    end
 
-    -- Calcula el centro del target (ajusta si quieres más/menos offset vertical)
+    -- Intentamos usar HumanoidRootPart como referencia del jugador; si no, Head
+    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+    if not root then
+        cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPart.Position)
+        return
+    end
+
+    -- Calculamos la posición exacta del centro del target.
+    -- Tomamos la posición del part y compensamos ligeramente para centrar verticalmente.
     local targetPos = targetPart.Position
-    -- Si la parte tiene tamaño, centra un poco verticalmente (opcional)
     if targetPart:IsA("BasePart") then
+        -- Ajuste vertical para acercarnos al centro del torso/cabeza
         targetPos = targetPos + Vector3.new(0, targetPart.Size.Y * 0.0, 0)
     end
 
-    -- Forzamos la cámara a mirar exactamente al centro del objetivo (desde la cámara actual)
+    -- Forzamos la cámara a mirar exactamente al centro del target.
     cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
 end
 
 local function isTimerVisible()
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
     if not pg then return false end
     local gameUI = pg:FindFirstChild("GameUI")
     if not gameUI then return false end
@@ -129,7 +140,7 @@ end
 
 local function getLibraryBookTargets()
     local models = {}
-    local char = LocalPlayer.Character
+    local char = LocalPlayer and LocalPlayer.Character
     if not char then return models end
     if char.Parent and char.Parent.Name == "Students" and hasLibraryBook(char) then
         for _, m in ipairs(getModelsFromFolders({"Teachers", "Alices"})) do
@@ -143,7 +154,7 @@ end
 
 local function getThavelTargets()
     local models = {}
-    local char = LocalPlayer.Character
+    local char = LocalPlayer and LocalPlayer.Character
     if not char then return models end
     if char:GetAttribute("TeacherName") == "Thavel" and char:GetAttribute("Charging") == true then
         for _, m in ipairs(getModelsFromFolders({"Students", "Alices"})) do
@@ -155,15 +166,13 @@ local function getThavelTargets()
     return models
 end
 
--- =====================================================
--- ⚙️ NUEVO SISTEMA AUTOMÁTICO DE MODO CIRCLE
--- =====================================================
-
 local charConnections = {}
 
 local function clearCharConnections()
     for _, conn in ipairs(charConnections) do
-        if conn and conn.Disconnect then conn:Disconnect() end
+        if conn and conn.Disconnect then
+            conn:Disconnect()
+        end
     end
     charConnections = {}
 end
@@ -181,22 +190,17 @@ local function bindCircleDetection(char)
     clearCharConnections()
     circleActive = checkCircleConditions(char)
 
-    if not char then return end
-
-    -- Detectar cambios en atributos del Character
-    pcall(function()
-        table.insert(charConnections, char:GetAttributeChangedSignal("TeacherName"):Connect(function()
-            circleActive = checkCircleConditions(char)
-        end))
+    -- Detectar cambios en atributos del Character (TeacherName)
+    local attrConn = char:GetAttributeChangedSignal("TeacherName"):Connect(function()
+        circleActive = checkCircleConditions(char)
     end)
+    table.insert(charConnections, attrConn)
 
     -- Detectar si el Character cambia de carpeta (Teachers u otra)
-    local ok, parentConn = pcall(function()
-        return char:GetPropertyChangedSignal("Parent"):Connect(function()
-            circleActive = checkCircleConditions(char)
-        end)
+    local parentConn = char:GetPropertyChangedSignal("Parent"):Connect(function()
+        circleActive = checkCircleConditions(char)
     end)
-    if ok and parentConn then table.insert(charConnections, parentConn) end
+    table.insert(charConnections, parentConn)
 
     -- Detectar cambios dentro del Humanoid (aparición/desaparición de SprintLock)
     local humanoid = char:FindFirstChild("Humanoid")
@@ -231,7 +235,7 @@ end
 
 local function getCircleTargets()
     local models = {}
-    local char = LocalPlayer.Character
+    local char = LocalPlayer and LocalPlayer.Character
     if not char then return models end
     if not circleActive then return models end
     if isTimerVisible() then return models end
@@ -248,7 +252,7 @@ local function getBloomieTargets()
     local models = {}
     local teachers = Workspace:FindFirstChild("Teachers")
     if not teachers then return models end
-    local myModel = teachers:FindFirstChild(LocalPlayer.Name)
+    local myModel = teachers:FindFirstChild(LocalPlayer and LocalPlayer.Name)
     if myModel and myModel:GetAttribute("TeacherName") == "Bloomie" and myModel:GetAttribute("Aiming") == true then
         for _, m in ipairs(getModelsFromFolders({"Students", "Alices"})) do
             if m ~= myModel and (m:FindFirstChild("Head") or m:FindFirstChild("UpperTorso") or m:FindFirstChild("Torso")) then
@@ -301,7 +305,7 @@ local function chooseTarget(models, parts)
 end
 
 -- =====================================================
--- 🔁 CONTROL DE ACTIVACIÓN / DESACTIVACIÓN TOTAL DEL AIMBOT
+-- 🧠 Activación / desactivación total del Aimbot
 -- =====================================================
 
 local aimbotConnection = nil
@@ -309,7 +313,7 @@ local activationConns = {}
 
 -- Comprueba si el jugador cumple algún requisito de modo
 local function isEligible()
-    local char = LocalPlayer.Character
+    local char = LocalPlayer and LocalPlayer.Character
     if not char then return false end
 
     local teacher = char:GetAttribute("TeacherName")
@@ -329,7 +333,7 @@ local function isEligible()
     return false
 end
 
--- Función principal del Aimbot (loop por frame)
+-- Función principal del Aimbot (loop por frame mientras está activo)
 local function runAimbot()
     if aimbotConnection then aimbotConnection:Disconnect() end
 
@@ -342,17 +346,15 @@ local function runAimbot()
             return
         end
 
-        local char = LocalPlayer.Character
+        local char = LocalPlayer and LocalPlayer.Character
         if not char then return end
 
-        -- Optimización: chequeo rápido de atributos para evitar cálculos innecesarios
-        local teacher = char:GetAttribute("TeacherName")
+        -- PRE-FILTER RÁPIDO: si claramente no cumples condiciones internas, evitar recolectar modelos
+        local attrTeacher = char:GetAttribute("TeacherName")
         local hasBook = hasLibraryBook(char)
         local humanoid = char:FindFirstChild("Humanoid")
         local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
-
-        -- Si claramente no cumple modos, salimos rápido (esto reduce trabajo cerca de muchos players)
-        if not (hasBook or (teacher == "Thavel" and char:GetAttribute("Charging") == true) or (teacher == "Circle" and sprintLock) or (teacher == "Bloomie" and char:GetAttribute("Aiming") == true)) then
+        if not (hasBook or (attrTeacher == "Thavel" and char:GetAttribute("Charging")) or (attrTeacher == "Circle" and sprintLock) or (attrTeacher == "Bloomie" and char:GetAttribute("Aiming"))) then
             return
         end
 
@@ -386,20 +388,22 @@ local function runAimbot()
     end)
 end
 
--- =====================================================
--- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
--- =====================================================
-
+-- Limpia conexiones de activación automáticas
 local function clearActivationConns()
     for _, c in ipairs(activationConns) do
         if c and c.Disconnect then
-            pcall(function() c:Disconnect() end)
+            c:Disconnect()
         end
     end
     activationConns = {}
 end
 
+-- =====================================================
+-- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
+-- =====================================================
+
 local function bindAutoActivation()
+    -- limpiar conexiones previas (si las hay)
     clearActivationConns()
 
     local function checkAndRun()
@@ -408,41 +412,47 @@ local function bindAutoActivation()
         end
     end
 
-    -- Escuchar eventos clave del Character y del Player
-    local function bindForChar(char)
-        if not char then return end
-        table.insert(activationConns, char:GetAttributeChangedSignal("TeacherName"):Connect(checkAndRun))
-        table.insert(activationConns, char.ChildAdded:Connect(checkAndRun))
-        table.insert(activationConns, char.ChildRemoved:Connect(checkAndRun))
-        -- Atributos que pueden cambiar en el personaje (Charging, Aiming)
-        table.insert(activationConns, char:GetAttributeChangedSignal("Charging"):Connect(checkAndRun))
-        table.insert(activationConns, char:GetAttributeChangedSignal("Aiming"):Connect(checkAndRun))
+    local char = LocalPlayer and LocalPlayer.Character
+    if not char then return end
+
+    -- Escuchar varios cambios que puedan activar el modo: atributos relevantes y cambios del Character
+    table.insert(activationConns, char:GetAttributeChangedSignal("TeacherName"):Connect(checkAndRun))
+    table.insert(activationConns, char:GetAttributeChangedSignal("Charging"):Connect(checkAndRun))
+    table.insert(activationConns, char:GetAttributeChangedSignal("Aiming"):Connect(checkAndRun))
+
+    -- ChildAdded/Removed despiertan (herramientas, SprintLock, etc.)
+    table.insert(activationConns, char.ChildAdded:Connect(checkAndRun))
+    table.insert(activationConns, char.ChildRemoved:Connect(checkAndRun))
+
+    -- Si hay Humanoid, escuchar cambios internos por si aparece SprintLock
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        table.insert(activationConns, humanoid.ChildAdded:Connect(checkAndRun))
+        table.insert(activationConns, humanoid.ChildRemoved:Connect(checkAndRun))
     end
 
-    if LocalPlayer.Character then
-        bindForChar(LocalPlayer.Character)
-    end
-
-    table.insert(activationConns, LocalPlayer.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
-        bindForChar(char)
-        checkAndRun()
-    end))
-
-    table.insert(activationConns, LocalPlayer.CharacterRemoving:Connect(function()
-        clearActivationConns()
-        if aimbotConnection then
-            aimbotConnection:Disconnect()
-            aimbotConnection = nil
-        end
-    end))
-
-    -- Comprobación inicial
+    -- Lanzamiento inicial
     checkAndRun()
 end
 
-if LocalPlayer then
+-- Inicialización
+if LocalPlayer.Character then
     bindAutoActivation()
 end
 
--- Fin del script
+LocalPlayer.CharacterAdded:Connect(function(char)
+    -- esperar un pelín a que se creen atributos y humanoid
+    task.wait(0.5)
+    bindAutoActivation()
+end)
+
+LocalPlayer.CharacterRemoving:Connect(function()
+    -- Desconectar aimbot si está corriendo y limpiar listeners
+    if aimbotConnection then
+        aimbotConnection:Disconnect()
+        aimbotConnection = nil
+    end
+    clearActivationConns()
+end)
+
+-- FIN
