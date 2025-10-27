@@ -297,7 +297,7 @@ RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
 
-        -- 💤 Reposo inteligente: si no se cumple ninguno de los 4 modos, se suspende hasta que sí
+-- 💤 Reposo total hasta que se cumpla algún modo
 local function hasAnyModeActive()
 	local char = LocalPlayer.Character
 	if not char then return false end
@@ -309,11 +309,32 @@ local function hasAnyModeActive()
 	)
 end
 
+-- Si no hay ningún modo activo, el script se "duerme" hasta que algo cambie
 if not hasAnyModeActive() then
-	repeat
-		task.wait(0.2)
-	until hasAnyModeActive()
-        end
+	local awakened = false
+	local char = LocalPlayer.Character
+
+	-- Crea conexiones temporales que "despiertan" al script
+	local conns = {}
+
+	local function wake()
+		awakened = true
+		for _, c in ipairs(conns) do
+			if c and c.Disconnect then c:Disconnect() end
+		end
+		conns = {}
+	end
+
+	-- Escucha cambios de atributos y herramientas del personaje
+	if char then
+		table.insert(conns, char.AttributeChanged:Connect(wake))
+		table.insert(conns, char.ChildAdded:Connect(wake))
+		table.insert(conns, char.ChildRemoved:Connect(wake))
+	end
+
+	-- Espera dormido hasta que se cumpla una condición o se despierte por evento
+	repeat task.wait() until awakened or hasAnyModeActive()
+		end
 
     -- reset relativo y selección inmediata cada frame
     currentTarget, currentMode = nil, nil
