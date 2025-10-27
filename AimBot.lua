@@ -292,94 +292,107 @@ end
 -- =====================================================
 -- 🔁 LOOP PRINCIPAL (actualiza e intenta apuntar cada frame)
 -- =====================================================
+-- 🧠 Activación / desactivación total del Aimbot
+-- =====================================================
 
-RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
+local aimbotConnection = nil
 
--- 💤 Reposo total hasta que se cumpla algún modo
-local function hasAnyModeActive()
+-- Comprueba si el jugador cumple algún requisito de modo
+local function isEligible()
 	local char = LocalPlayer.Character
 	if not char then return false end
-	return (
-		(#getLibraryBookTargets() > 0)
-		or (#getThavelTargets() > 0)
-		or (#getCircleTargets() > 0)
-		or (#getBloomieTargets() > 0)
-	)
+
+	local teacher = char:GetAttribute("TeacherName")
+	local hasBook = hasLibraryBook(char)
+	local humanoid = char:FindFirstChild("Humanoid")
+	local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
+
+	if (char.Parent and char.Parent.Name == "Students" and hasBook) then
+		return true
+	elseif (teacher == "Thavel" and char:GetAttribute("Charging") == true) then
+		return true
+	elseif (teacher == "Circle" and sprintLock) then
+		return true
+	elseif (teacher == "Bloomie" and char:GetAttribute("Aiming") == true) then
+		return true
+	end
+	return false
 end
 
--- Si no hay ningún modo activo, el script se "duerme" hasta que algo cambie
-if not hasAnyModeActive() then
-	local awakened = false
+-- Función principal del Aimbot (idéntica a tu loop anterior)
+local function runAimbot()
+	if aimbotConnection then aimbotConnection:Disconnect() end
+
+	aimbotConnection = RunService.RenderStepped:Connect(function()
+		if not isEligible() then
+			if aimbotConnection then
+				aimbotConnection:Disconnect()
+				aimbotConnection = nil
+			end
+			return
+		end
+
+		local char = LocalPlayer.Character
+		if not char then return end
+
+		local lib = getLibraryBookTargets()
+		local thavel = getThavelTargets()
+		local circle = getCircleTargets()
+		local bloomie = getBloomieTargets()
+
+		local currentTarget, currentMode = nil, nil
+
+		if #lib > 0 then
+			currentTarget = chooseTarget(lib, AIM_PARTS.LibraryBook)
+			currentMode = "LibraryBook"
+		elseif #thavel > 0 then
+			currentTarget = chooseTarget(thavel, AIM_PARTS.Thavel)
+			currentMode = "Thavel"
+		elseif #circle > 0 then
+			currentTarget = chooseTarget(circle, AIM_PARTS.Circle)
+			currentMode = "Circle"
+		elseif #bloomie > 0 then
+			currentTarget = chooseTarget(bloomie, AIM_PARTS.Bloomie)
+			currentMode = "Bloomie"
+		end
+
+		if currentTarget and currentMode then
+			local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
+			if part then
+				lockCameraToTargetPart(part)
+			end
+		end
+	end)
+end
+
+-- =====================================================
+-- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
+-- =====================================================
+
+local function bindAutoActivation()
+	local function checkAndRun()
+		if not aimbotConnection and isEligible() then
+			runAimbot()
+		end
+	end
+
+	-- Escuchar eventos clave
 	local char = LocalPlayer.Character
+	if not char then return end
 
-	-- Crea conexiones temporales que "despiertan" al script
-	local conns = {}
+	char.AttributeChanged:Connect(checkAndRun)
+	char.ChildAdded:Connect(checkAndRun)
+	char.ChildRemoved:Connect(checkAndRun)
 
-	local function wake()
-		awakened = true
-		for _, c in ipairs(conns) do
-			if c and c.Disconnect then c:Disconnect() end
-		end
-		conns = {}
-	end
+	-- Arranque inicial
+	checkAndRun()
+end
 
-	-- Escucha cambios de atributos y herramientas del personaje
-	if char then
-		table.insert(conns, char.AttributeChanged:Connect(wake))
-		table.insert(conns, char.ChildAdded:Connect(wake))
-		table.insert(conns, char.ChildRemoved:Connect(wake))
-	end
+if LocalPlayer.Character then
+	bindAutoActivation()
+end
 
-	-- Espera dormido hasta que se cumpla una condición o se despierte por evento
-	repeat task.wait(0.15) until awakened or hasAnyModeActive()
-		end
-
-    -- reset relativo y selección inmediata cada frame
-    currentTarget, currentMode = nil, nil
-
-		-- ⚙️ Salida anticipada: si el jugador no está en modo válido, no calcular nada
-local char = LocalPlayer.Character
-if not char then return end
-
--- Pequeña optimización: si no tiene atributos o tool posibles, dormirse ya
-local attrTeacher = char:GetAttribute("TeacherName")
-local hasBook = hasLibraryBook(char)
-local sprintLock = char:FindFirstChildWhichIsA("Humanoid") and char.Humanoid:FindFirstChild("SprintLock")
-
-if not (hasBook or (attrTeacher == "Thavel" and char:GetAttribute("Charging")) or (attrTeacher == "Circle" and sprintLock) or (attrTeacher == "Bloomie" and char:GetAttribute("Aiming"))) then
-	-- 💤 Dormir si no cumple ningún modo, evita calcular targets
-	task.wait(0.15)
-	return
-		end
-
-    -- recolectar candidatos por prioridad de modo
-    local lib = getLibraryBookTargets()
-    local thavel = getThavelTargets()
-    local circle = getCircleTargets()
-    local bloomie = getBloomieTargets()
-
-    if #lib > 0 then
-        currentTarget = chooseTarget(lib, AIM_PARTS.LibraryBook)
-        currentMode = "LibraryBook"
-    elseif #thavel > 0 then
-        currentTarget = chooseTarget(thavel, AIM_PARTS.Thavel)
-        currentMode = "Thavel"
-    elseif #circle > 0 then
-        currentTarget = chooseTarget(circle, AIM_PARTS.Circle)
-        currentMode = "Circle"
-    elseif #bloomie > 0 then
-        currentTarget = chooseTarget(bloomie, AIM_PARTS.Bloomie)
-        currentMode = "Bloomie"
-    end
-
-    if currentTarget and currentMode then
-        local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
-        if part then
-            lockCameraToTargetPart(part)
-        else
-            currentTarget, currentMode = nil, nil
-        end
-    end
+LocalPlayer.CharacterAdded:Connect(function(char)
+	task.wait(1)
+	bindAutoActivation()
 end)
