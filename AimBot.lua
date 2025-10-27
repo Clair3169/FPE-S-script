@@ -94,30 +94,33 @@ local function lockCameraToTargetPart(targetPart)
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
-
-	-- 1. Obtenemos la POSICIÓN FÍSICA actual de la cámara (ej. en el hombro)
-	local camPos = cam.CFrame.Position
-
-	-- 2. Obtenemos la POSICIÓN REAL DE LA VISTA (el "ojo" o centro de la pantalla)
-	-- Esto es crucial para corregir el parallax del ShiftLock.
+	
+	-- 1. Obtenemos el rayo que sale del CENTRO de tu pantalla
 	local viewportCenter = cam.ViewportSize / 2
 	local centerRay = cam:ScreenPointToRay(viewportCenter.X, viewportCenter.Y)
+
+	-- 2. 'eyePos' es la posición física de la cámara (el hombro)
+	local eyePos = centerRay.Origin 
 	
-	-- El 'eyePosition' es el verdadero punto de origen de tu mira
-	local eyePosition = centerRay.Origin
+	-- 3. 'currentLook' es la dirección a la que MIRA el centro de tu pantalla
+	local currentLook = centerRay.Direction 
 
-	-- 3. Calculamos el vector de mirada (dirección)
-	-- Se calcula desde el OJO (eyePosition) al objetivo (targetPos)
-	local newLookVector = (targetPos - eyePosition).Unit
+	-- 4. 'desiredLook' es la dirección a la que DEBERÍA mirar la cámara
+	-- (la dirección desde el hombro hasta el objetivo)
+	local desiredLook = (targetPos - eyePos).Unit
 
-	-- 4. Creamos el punto al que la cámara debe mirar
-	-- Le decimos a la cámara física (camPos) que mire en la dirección correcta (newLookVector)
-	local newLookAtPoint = camPos + newLookVector
+	-- 5. CALCULAMOS LA ROTACIÓN 'DELTA' (LA DIFERENCIA)
+	-- Esta es la parte clave: calculamos la rotación necesaria para mover
+	-- 'currentLook' (donde miras) a 'desiredLook' (donde quieres mirar).
+	-- CFrame.new(pos, look) está obsoleto, pero para vectores (sin pos) sigue siendo la
+	-- forma más limpia de crear una CFrame de rotación pura.
+	local deltaRotation = CFrame.new(Vector3.new(), desiredLook) * CFrame.new(Vector3.new(), currentLook):Inverse()
 
-	-- 5. Aplicamos el CFrame
-	-- La cámara se queda en su posición (camPos), 
-	-- pero ahora apunta a 'newLookAtPoint', forzando la rotación correcta.
-	cam.CFrame = CFrame.lookAt(camPos, newLookAtPoint)
+	-- 6. APLICAMOS LA ROTACIÓN
+	-- Multiplicamos el CFrame actual de la cámara (que incluye la posición
+	-- del hombro del ShiftLock) por la rotación que acabamos de calcular.
+	-- Esto ROTA la cámara sin moverla de sitio.
+	cam.CFrame = cam.CFrame * deltaRotation
 end
 
 local function isTimerVisible()
