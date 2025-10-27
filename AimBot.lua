@@ -97,10 +97,25 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 local function lockCameraToTargetPart(targetPart)
-    if not targetPart or not Workspace.CurrentCamera then return end
-    local cam = Workspace.CurrentCamera
-    local camPos = cam.CFrame.Position
-    cam.CFrame = CFrame.lookAt(camPos, targetPart.Position)
+	if not targetPart or not Workspace.CurrentCamera then return end
+
+	local cam = Workspace.CurrentCamera
+	local camPos = cam.CFrame.Position
+
+	-- 🔧 Ajuste: usar el centro del mouse si ShiftLock está activo
+	local mouse = LocalPlayer:GetMouse()
+	local mouseHit = mouse.Hit and mouse.Hit.Position
+
+	if LocalPlayer.DevEnableMouseLock and UserSettings().GameSettings.ControlMode == Enum.ControlMode.MouseLockSwitch then
+		-- Si shiftlock está activo, usamos la posición de impacto del mouse
+		if mouseHit then
+			cam.CFrame = CFrame.lookAt(camPos, mouseHit:Lerp(targetPart.Position, 0.3))
+			return
+		end
+	end
+
+	-- Fallback normal (modo sin shiftlock)
+	cam.CFrame = CFrame.lookAt(camPos, targetPart.Position)
 end
 
 local function isTimerVisible()
