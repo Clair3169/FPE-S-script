@@ -333,11 +333,26 @@ if not hasAnyModeActive() then
 	end
 
 	-- Espera dormido hasta que se cumpla una condición o se despierte por evento
-	repeat task.wait() until awakened or hasAnyModeActive()
+	repeat task.wait(0.15) until awakened or hasAnyModeActive()
 		end
 
     -- reset relativo y selección inmediata cada frame
     currentTarget, currentMode = nil, nil
+
+		-- ⚙️ Salida anticipada: si el jugador no está en modo válido, no calcular nada
+local char = LocalPlayer.Character
+if not char then return end
+
+-- Pequeña optimización: si no tiene atributos o tool posibles, dormirse ya
+local attrTeacher = char:GetAttribute("TeacherName")
+local hasBook = hasLibraryBook(char)
+local sprintLock = char:FindFirstChildWhichIsA("Humanoid") and char.Humanoid:FindFirstChild("SprintLock")
+
+if not (hasBook or (attrTeacher == "Thavel" and char:GetAttribute("Charging")) or (attrTeacher == "Circle" and sprintLock) or (attrTeacher == "Bloomie" and char:GetAttribute("Aiming"))) then
+	-- 💤 Dormir si no cumple ningún modo, evita calcular targets
+	task.wait(0.15)
+	return
+		end
 
     -- recolectar candidatos por prioridad de modo
     local lib = getLibraryBookTargets()
