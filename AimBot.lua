@@ -89,34 +89,30 @@ local function getTargetPartByPriority(model, priorityList)
     return nil
 end
 
--- Apunta la cámara de manera que el centro del target quede centrado en el crosshair
--- Ignora offsets laterales: apuntado directo al centro del objetivo
 local function lockCameraToTargetPart(targetPart)
     if not targetPart or not Workspace.CurrentCamera then return end
     local cam = Workspace.CurrentCamera
     local char = LocalPlayer and LocalPlayer.Character
     if not char then
-        -- fallback si no hay character: apuntar desde la cámara hacia la parte
         cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPart.Position)
         return
     end
 
-    -- Intentamos usar HumanoidRootPart como referencia del jugador; si no, Head
     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
     if not root then
         cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPart.Position)
         return
     end
 
-    -- Calculamos la posición exacta del centro del target.
-    -- Tomamos la posición del part y compensamos ligeramente para centrar verticalmente.
-    local targetPos = targetPart.Position
-    if targetPart:IsA("BasePart") then
-        -- Ajuste vertical para acercarnos al centro del torso/cabeza
-        targetPos = targetPos + Vector3.new(0, targetPart.Size.Y * 0.0, 0)
-    end
+    -- ✅ CENTRADO REAL: usa CFrame del part para calcular su punto frontal medio
+    local partCFrame = targetPart.CFrame
+    local partCenter = partCFrame.Position
 
-    -- Forzamos la cámara a mirar exactamente al centro del target.
+    -- Opcional: compensa un poco hacia la mitad vertical del part
+    local offset = Vector3.new(0, targetPart.Size.Y * 0.5, 0)
+    local targetPos = partCenter + offset
+
+    -- ✅ Cámara apuntando al centro visual del target, sin desplazamientos laterales
     cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
 end
 
