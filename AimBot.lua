@@ -100,19 +100,19 @@ local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 
 	local cam = Workspace.CurrentCamera
-	local camPos = cam.CFrame.Position
+	local char = LocalPlayer.Character
+	if not char then return end
 
-	-- 🔧 Ajuste: usar el centro del mouse si ShiftLock está activo
-	local mouse = LocalPlayer:GetMouse()
-	local mouseHit = mouse.Hit and mouse.Hit.Position
+	-- Obtiene posición base del jugador (cerca del cuello o torso)
+	local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+	if not root then return end
 
-	if LocalPlayer.DevEnableMouseLock and UserSettings().GameSettings.ControlMode == Enum.ControlMode.MouseLockSwitch then
-		-- Si shiftlock está activo, usamos la posición de impacto del mouse
-		if mouseHit then
-			cam.CFrame = CFrame.lookAt(camPos, mouseHit:Lerp(targetPart.Position, 0.3))
-			return
-		end
-	end
+	-- Apunta desde el jugador directamente hacia el centro del target (no desde la cámara)
+	local origin = root.Position + Vector3.new(0, 1.5, 0)
+	local targetPos = targetPart.Position + Vector3.new(0, targetPart.Size.Y * 0.25, 0)
+
+	cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
+end
 
 	-- Fallback normal (modo sin shiftlock)
 	cam.CFrame = CFrame.lookAt(camPos, targetPart.Position)
