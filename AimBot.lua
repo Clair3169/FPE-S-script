@@ -11,7 +11,7 @@ local AIM_PARTS = {
 }
 
 -- Máximo en studs para considerar un objetivo (ajusta si quieres más alcance)
-local MAX_TARGET_DISTANCE = 250
+local MAX_TARGET_DISTANCE = 150
 
 repeat task.wait() until game:IsLoaded()
 
