@@ -90,30 +90,19 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 local function lockCameraToTargetPart(targetPart)
-    if not targetPart or not Workspace.CurrentCamera then return end
-    local cam = Workspace.CurrentCamera
-    local char = LocalPlayer and LocalPlayer.Character
-    if not char then
-        cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPart.Position)
-        return
-    end
+	if not targetPart or not Workspace.CurrentCamera then return end
 
-    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-    if not root then
-        cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPart.Position)
-        return
-    end
+	local cam = Workspace.CurrentCamera
+	local targetPos = targetPart.Position
 
-    -- ✅ CENTRADO REAL: usa CFrame del part para calcular su punto frontal medio
-    local partCFrame = targetPart.CFrame
-    local partCenter = partCFrame.Position
+	-- ✅ En lugar de mover la cámara completa, solo cambiamos su orientación (manteniendo el mouse centrado)
+	local camCFrame = cam.CFrame
+	local newLook = (targetPos - camCFrame.Position).Unit
+	local _, _, _, r00, r01, r02, r10, r11, r12, r20, r21, r22 = camCFrame:GetComponents()
+	local right = Vector3.new(r00, r10, r20)
+	local up = right:Cross(newLook).Unit:Cross(right).Unit
 
-    -- Opcional: compensa un poco hacia la mitad vertical del part
-    local offset = Vector3.new(0, targetPart.Size.Y * 0.5, 0)
-    local targetPos = partCenter + offset
-
-    -- ✅ Cámara apuntando al centro visual del target, sin desplazamientos laterales
-    cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
+	cam.CFrame = CFrame.fromMatrix(camCFrame.Position, right, up, -newLook)
 end
 
 local function isTimerVisible()
