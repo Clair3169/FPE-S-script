@@ -91,26 +91,39 @@ end
 
 
 
-local function getShiftLockOffset()
-	local playerModule = LocalPlayer:FindFirstChild("PlayerScripts") and
-		LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-	if not playerModule then return Vector3.zero end
-	local controls = require(playerModule:WaitForChild("CameraModule"))
-	if controls and controls.cameraSubject then
-		-- Estimación simple del offset (hacia la derecha)
-		return Vector3.new(2, 0, 0)
-	end
-	return Vector3.zero
+-- =====================================================
+-- 🎯 Función ajustable con compensación para ShiftLock
+-- =====================================================
+
+-- Ajuste lateral manual (positivo = derecha, negativo = izquierda)
+local SHIFTLOCK_X_ADJUST = -1.7 -- ajusta este valor hasta centrar el aimbot en ShiftLock
+
+-- Detección del estado del ShiftLock personalizado
+local function isShiftLockActive()
+	local gui = game:GetService("CoreGui"):FindFirstChild("Shiftlock (CoreGui)")
+	if not gui then return false end
+	local cursor = gui:FindFirstChild("ShiftlockCursor")
+	return cursor and cursor.Visible
 end
 
+-- Versión mejorada de lockCameraToTargetPart
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 	local cam = Workspace.CurrentCamera
 	local camPos = cam.CFrame.Position
-	local offset = getShiftLockOffset()
-	local adjustedPos = camPos + cam.CFrame.RightVector * offset.X
-	cam.CFrame = CFrame.lookAt(adjustedPos, targetPart.Position)
-	cam.Focus = CFrame.new(targetPart.Position)
+
+	-- Si el ShiftLock está activo, aplica una corrección lateral ajustable
+	if isShiftLockActive() then
+		-- Mueve el punto de origen lateralmente (izquierda/derecha)
+		camPos = camPos + (cam.CFrame.RightVector * SHIFTLOCK_X_ADJUST)
+	end
+
+	-- CFrame apuntando al objetivo (usa el eje Y para mantener el "up" correcto)
+	local look = CFrame.lookAt(camPos, targetPart.Position, Vector3.new(0, 1, 0))
+	cam.CFrame = look
+	pcall(function()
+		cam.Focus = CFrame.new(targetPart.Position)
+	end)
 end
 
 
