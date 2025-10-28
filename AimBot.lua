@@ -410,30 +410,81 @@ end
 -- =====================================================
 -- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
 -- =====================================================
+-- Espera hasta que la cámara deje de moverse (o hasta timeout) antes de continuar.
+-- Devuelve true si la cámara se estabilizó, false si se llegó a timeout.
+local function waitForCameraStable(timeoutSeconds, movementThreshold)
+	timeoutSeconds = timeoutSeconds or 0.25 -- tiempo máximo a esperar
+	movementThreshold = movementThreshold or 0.01 -- distancia máxima entre posiciones (en studs) para considerarla estable
+
+	local cam = Workspace.CurrentCamera
+	if not cam then return false end
+
+	local start = tick()
+	local lastPos = cam.CFrame.Position
+
+	-- comprobar en pequeños ticks; usamos task.wait(0) para esperar "un frame"
+	while tick() - start < timeoutSeconds do
+		task.wait(0)
+		cam = Workspace.CurrentCamera
+		if not cam then return false end
+
+		local newPos = cam.CFrame.Position
+		local delta = (newPos - lastPos).Magnitude
+
+		-- Si la cámara se ha movido poco entre muestras, considerar estable
+		if delta <= movementThreshold then
+			-- verificamos una vez más para mayor robustez (dos medidas consecutivas estables)
+			task.wait(0)
+			cam = Workspace.CurrentCamera
+			if not cam then return false end
+			local newPos2 = cam.CFrame.Position
+			if (newPos2 - newPos).Magnitude <= movementThreshold then
+				return true
+			end
+			lastPos = newPos2
+		else
+			lastPos = newPos
+		end
+	end
+
+	return false
+end
 
 local function bindAutoActivation()
 	-- limpiar conexiones previas (si las hay)
 	clearActivationConns()
 
 	local function checkAndRun()
-		-- Si somos elegibles y el loop no corre, iniciarlo.
+		-- Si somos elegibles y el loop no corre, iniciar (posible espera para cámara estable)
 		if not isAimbotRunning and isEligible() then
-			-- Si estamos en modo Circle (ShiftLock) hacer el bind un tick después para
-			-- evitar que ShiftLock u otro sistema sobreescriba la cámara en el mismo frame.
-			-- Esto mantiene BindToRenderStep y la optimización, pero evita la carrera.
 			local char = LocalPlayer and LocalPlayer.Character
 			local teacher = char and char:GetAttribute("TeacherName")
 			local humanoid = char and char:FindFirstChild("Humanoid")
 			local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
 
+			-- Si es Circle con SprintLock, esperar a que la cámara quede estable
 			if teacher == "Circle" and sprintLock then
-				-- bind en el siguiente tick
+				-- arrancar en tarea separada para no bloquear el hilo principal de escucha
 				task.spawn(function()
-					-- esperar un frame para que otras actualizaciones de cámara se realicen primero
-					task.wait(0)
-					-- volver a comprobar elegibilidad antes de bindear
+					-- primer intento rápido: esperar hasta 0.25s por estabilidad (ajustable)
+					local stable = waitForCameraStable(0.25, 0.015)
+					-- si no se estabilizó, intentar un pequeño reintento más largo
+					if not stable then
+						stable = waitForCameraStable(0.5, 0.02)
+					end
+					-- Solo bindear si seguimos siendo elegibles y aún no está corriendo
 					if not isAimbotRunning and isEligible() then
-						runAimbot()
+						-- preferimos bindear si la cámara está estable; si no lo está, bindear igualmente
+						-- (esto evita bloquear forever si la cámara no se estabiliza por diseño)
+						if stable then
+							runAimbot()
+						else
+							-- si no se estabilizó, aún hacemos un bind con un pequeño retardo para minimizar carreras
+							task.wait(0)
+							if not isAimbotRunning and isEligible() then
+								runAimbot()
+							end
+						end
 					end
 				end)
 			else
@@ -471,15 +522,13 @@ local function bindAutoActivation()
 		end
 	end
 
-	-- Adicional: escuchar cambios en la cámara que puedan indicar que ShiftLock u otra lógica está activa.
-	-- Si la cámara cambia tipo o CFrame, re-evaluamos la activación.
-	-- (Protegemos con pcall por si CurrentCamera no existe momentáneamente)
+	-- Escuchar cambios en la cámara: si la cámara cambia, re-evaluar.
+	-- Esto ayuda cuando ShiftLock u otra lógica cambia CameraType/CFrame/Subject.
 	pcall(function()
 		local cam = Workspace.CurrentCamera
 		if cam then
 			table.insert(activationConns, cam:GetPropertyChangedSignal("CameraType"):Connect(checkAndRun))
 			table.insert(activationConns, cam:GetPropertyChangedSignal("CFrame"):Connect(checkAndRun))
-			-- Si el CameraSubject cambia (por ejemplo al morir/respawnear), re-evaluar
 			table.insert(activationConns, cam:GetPropertyChangedSignal("CameraSubject"):Connect(checkAndRun))
 		end
 	end)
@@ -493,18 +542,14 @@ local function runAimbot()
 	if isAimbotRunning then return end
 	isAimbotRunning = true
 
-	-- Elegimos una prioridad justo después de Camera para minimizar la posibilidad
-	-- de que ShiftLock u otro sistema nos sobreescriba en el mismo tick.
+	-- Prioridad justo después de Camera
 	local camPriority = Enum.RenderPriority.Camera.Value + 1
-
-	-- Bind a la función que ya tienes definida
 	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
 end
 
 -- Para el loop del Aimbot
 local function stopAimbot()
 	if not isAimbotRunning then return end
-	-- Unbind con pcall por seguridad
 	pcall(function()
 		RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
 	end)
@@ -530,7 +575,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 	-- esperar un pelín a que se creen atributos y humanoid
 	task.wait(0.5)
 	bindAutoActivation()
-	-- Asegurarse de re-bindear la detección de Circle (si tienes esa función)
+	-- Asegurarse de re-bindear la detección de Circle
 	bindCircleDetection(char)
 end)
 
