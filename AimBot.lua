@@ -407,97 +407,28 @@ local function clearActivationConns()
 	end
 	activationConns = {}
 end
+
 -- =====================================================
 -- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
 -- =====================================================
--- Espera hasta que la cámara deje de moverse (o hasta timeout) antes de continuar.
--- Devuelve true si la cámara se estabilizó, false si se llegó a timeout.
-local function waitForCameraStable(timeoutSeconds, movementThreshold)
-	timeoutSeconds = timeoutSeconds or 0.25 -- tiempo máximo a esperar
-	movementThreshold = movementThreshold or 0.01 -- distancia máxima entre posiciones (en studs) para considerarla estable
-
-	local cam = Workspace.CurrentCamera
-	if not cam then return false end
-
-	local start = tick()
-	local lastPos = cam.CFrame.Position
-
-	-- comprobar en pequeños ticks; usamos task.wait(0) para esperar "un frame"
-	while tick() - start < timeoutSeconds do
-		task.wait(0)
-		cam = Workspace.CurrentCamera
-		if not cam then return false end
-
-		local newPos = cam.CFrame.Position
-		local delta = (newPos - lastPos).Magnitude
-
-		-- Si la cámara se ha movido poco entre muestras, considerar estable
-		if delta <= movementThreshold then
-			-- verificamos una vez más para mayor robustez (dos medidas consecutivas estables)
-			task.wait(0)
-			cam = Workspace.CurrentCamera
-			if not cam then return false end
-			local newPos2 = cam.CFrame.Position
-			if (newPos2 - newPos).Magnitude <= movementThreshold then
-				return true
-			end
-			lastPos = newPos2
-		else
-			lastPos = newPos
-		end
-	end
-
-	return false
-end
 
 local function bindAutoActivation()
 	-- limpiar conexiones previas (si las hay)
 	clearActivationConns()
 
 	local function checkAndRun()
-		-- Si somos elegibles y el loop no corre, iniciar (posible espera para cámara estable)
+		-- Esta función ahora es más simple:
+		-- Si somos elegibles y el loop no corre, iniciarlo.
+		-- La propia función 'aimbotUpdateFunction' se parará sola si dejamos de ser elegibles.
 		if not isAimbotRunning and isEligible() then
-			local char = LocalPlayer and LocalPlayer.Character
-			local teacher = char and char:GetAttribute("TeacherName")
-			local humanoid = char and char:FindFirstChild("Humanoid")
-			local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
-
-			-- Si es Circle con SprintLock, esperar a que la cámara quede estable
-			if teacher == "Circle" and sprintLock then
-				-- arrancar en tarea separada para no bloquear el hilo principal de escucha
-				task.spawn(function()
-					-- primer intento rápido: esperar hasta 0.25s por estabilidad (ajustable)
-					local stable = waitForCameraStable(0.25, 0.015)
-					-- si no se estabilizó, intentar un pequeño reintento más largo
-					if not stable then
-						stable = waitForCameraStable(0.5, 0.02)
-					end
-					-- Solo bindear si seguimos siendo elegibles y aún no está corriendo
-					if not isAimbotRunning and isEligible() then
-						-- preferimos bindear si la cámara está estable; si no lo está, bindear igualmente
-						-- (esto evita bloquear forever si la cámara no se estabiliza por diseño)
-						if stable then
-							runAimbot()
-						else
-							-- si no se estabilizó, aún hacemos un bind con un pequeño retardo para minimizar carreras
-							task.wait(0)
-							if not isAimbotRunning and isEligible() then
-								runAimbot()
-							end
-						end
-					end
-				end)
-			else
-				-- modo normal: bind inmediato
-				runAimbot()
-			end
+			runAimbot()
 		end
 	end
 
 	local char = LocalPlayer and LocalPlayer.Character
 	if not char then return end
 
-	-- Escuchar cambios de atributos relevantes en el Character
+	-- Escuchar varios cambios que puedan activar el modo: atributos relevantes y cambios del Character
 	table.insert(activationConns, char:GetAttributeChangedSignal("TeacherName"):Connect(checkAndRun))
 	table.insert(activationConns, char:GetAttributeChangedSignal("Charging"):Connect(checkAndRun))
 	table.insert(activationConns, char:GetAttributeChangedSignal("Aiming"):Connect(checkAndRun))
@@ -513,7 +444,7 @@ local function bindAutoActivation()
 		table.insert(activationConns, humanoid.ChildRemoved:Connect(checkAndRun))
 	end
 
-	-- Escuchar también cambios en el Timer (si lo tienes)
+	-- Escuchar también cambios en el Timer
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
 	if pg then
 		local timer = pg:FindFirstChild("GameUI.Mobile.Alt.Timer", true)
@@ -522,51 +453,11 @@ local function bindAutoActivation()
 		end
 	end
 
-	-- Escuchar cambios en la cámara: si la cámara cambia, re-evaluar.
-	-- Esto ayuda cuando ShiftLock u otra lógica cambia CameraType/CFrame/Subject.
-	pcall(function()
-		local cam = Workspace.CurrentCamera
-		if cam then
-			table.insert(activationConns, cam:GetPropertyChangedSignal("CameraType"):Connect(checkAndRun))
-			table.insert(activationConns, cam:GetPropertyChangedSignal("CFrame"):Connect(checkAndRun))
-			table.insert(activationConns, cam:GetPropertyChangedSignal("CameraSubject"):Connect(checkAndRun))
-		end
-	end)
-
 	-- Lanzamiento inicial
 	checkAndRun()
 end
 
--- Inicia el loop del Aimbot con prioridad inmediatamente después de la cámara
-local function runAimbot()
-	if isAimbotRunning then return end
-	isAimbotRunning = true
-
-	-- Prioridad justo después de Camera
-	local camPriority = Enum.RenderPriority.Camera.Value + 1
-	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
-end
-
--- Para el loop del Aimbot
-local function stopAimbot()
-	if not isAimbotRunning then return end
-	pcall(function()
-		RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
-	end)
-	isAimbotRunning = false
-end
-
--- Limpia conexiones de activación automáticas
-local function clearActivationConns()
-	for _, c in ipairs(activationConns) do
-		if c and c.Disconnect then
-			pcall(function() c:Disconnect() end)
-		end
-	end
-	activationConns = {}
-end
-
--- Inicialización y hooks de Character
+-- Inicialización
 if LocalPlayer.Character then
 	bindAutoActivation()
 end
@@ -583,7 +474,7 @@ LocalPlayer.CharacterRemoving:Connect(function()
 	-- Desconectar aimbot si está corriendo y limpiar listeners
 	stopAimbot()
 	clearActivationConns()
-	-- Limpiar también las conexiones de Circle si usas esa lógica
+	-- Limpiar también las conexiones de Circle
 	clearCharConnections()
 	circleActive = false
 end)
