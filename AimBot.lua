@@ -88,27 +88,33 @@ local function getTargetPartByPriority(model, priorityList)
 	end
 	return nil
 end
-
 -- =====================================================
--- 🔒 FUNCIÓN DE CÁMARA (SIMPLE - sin cambiar CameraType)
+-- 🔒 FUNCIÓN DE CÁMARA (compensa offset lateral del shiftlock)
 -- =====================================================
 local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera then return end
+	if not targetPart or not Workspace.CurrentCamera or not Players.LocalPlayer then return end
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
+	local char = Players.LocalPlayer.Character
+	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
-	-- Leer la posición actual de la cámara (ojo) y su upVector actual
+	local hrp = char.HumanoidRootPart
 	local eyePos = cam.CFrame.Position
-	local upVec = cam.CFrame.UpVector or Vector3.new(0,1,0)
 
-	-- Si la distancia es prácticamente cero, evitar trabajar
-	if (targetPos - eyePos).Magnitude <= 0.0001 then return end
+	-- Calcular el offset de la cámara respecto al HRP (por ejemplo, el hombro)
+	local camOffset = hrp.CFrame:PointToObjectSpace(eyePos)
 
-	-- Usar lookAt pero preservando el upVector actual de la cámara.
-	-- Esto orienta la cámara para mirar EXACTAMENTE al centro del target,
-	-- manteniendo la rotación "vertical" que ya tenía el juego (evita desvíos laterales).
-	cam.CFrame = CFrame.lookAt(eyePos, targetPos, upVec)
+	-- Si la cámara está desplazada lateralmente (shiftlock), el eje X del offset lo refleja.
+	-- Compensamos ese desplazamiento aplicando la misma magnitud al objetivo,
+	-- pero en dirección opuesta en el espacio del HRP.
+	local correctedTargetPos = targetPos + hrp.CFrame.RightVector * (-camOffset.X)
+
+	-- Mantener el mismo upVector para no alterar el pitch o roll de la cámara
+	local upVec = cam.CFrame.UpVector or Vector3.new(0, 1, 0)
+
+	-- Ahora mirar al punto corregido (compensando el lado del hombro)
+	cam.CFrame = CFrame.lookAt(eyePos, correctedTargetPos, upVec)
 end
 
 local function isTimerVisible()
