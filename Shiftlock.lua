@@ -127,12 +127,21 @@ local function toggleShiftLock()
 						)
 					)
 				end
-				camera.CFrame = camera.CFrame * EnabledOffset
-				camera.Focus = CFrame.fromMatrix(
-					camera.Focus.Position,
-					camera.CFrame.RightVector,
-					camera.CFrame.UpVector
-				) * EnabledOffset
+				-- === 🔧 Nueva versión corregida (centrada y precisa) ===
+-- Calculamos un offset lateral real, respetando el eje del personaje
+local root = player.Character:FindFirstChild("HumanoidRootPart")
+if root then
+	-- Mantiene el offset lateral pero sin deformar el eje de rotación
+	local offsetStuds = 1.7 -- puedes ajustar este valor
+	local offsetVector = camera.CFrame.RightVector * offsetStuds
+
+	-- Posicionamos la cámara mirando desde el hombro, pero centrada correctamente
+	local cameraOrigin = root.Position + Vector3.new(0, 2, 0) + offsetVector
+	local lookAtPos = root.Position + Vector3.new(0, 1.5, 0) + (camera.CFrame.LookVector * 6)
+
+	camera.CFrame = CFrame.lookAt(cameraOrigin, lookAtPos, Vector3.new(0, 1, 0))
+	camera.Focus = CFrame.new(lookAtPos)
+end
 			end
 		end)
 	else
