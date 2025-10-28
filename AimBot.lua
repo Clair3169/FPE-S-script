@@ -107,7 +107,7 @@ local function lockCameraToTargetPart(targetPart)
 	-- 💡 Corrige el desplazamiento lateral del hombro (shiftlock)
 	-- Mueve la cámara un poco hacia la izquierda del personaje
 	-- Ajustá este valor según el juego: 1 = 1 stud (~normal shoulder offset)
-	local lateralCorrection = -3 -- negativo = mover hacia la izquierda
+	local lateralCorrection = 0 -- negativo = mover hacia la izquierda
 	local correctedEyePos = eyePos + cam.CFrame.RightVector * lateralCorrection
 
 	-- Vuelve a apuntar desde la nueva posición hacia el centro del target
