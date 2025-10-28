@@ -90,70 +90,46 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 -- =====================================================
--- 🔒 FUNCIÓN DE CÁMARA (Compensación precisa en pantalla + offset hombro)
+-- 🔒 FUNCIÓN DE CÁMARA (Corrección de paralaje consistente)
 -- =====================================================
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera or not Players.LocalPlayer then return end
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
+
+	-- Preferir un origen de disparo conocido; usar HumanoidRootPart por defecto
 	local char = Players.LocalPlayer.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
 
-	local hrp = char.HumanoidRootPart
+	-- Posiciones relevantes
 	local eyePos = cam.CFrame.Position
+	local hrpPos = hrp.Position
 
-	-- 1) Compensación sencilla por offset lateral del hombro (si existe)
-	local camOffset = hrp.CFrame:PointToObjectSpace(eyePos)
-	local compensatedTarget = targetPos + hrp.CFrame.RightVector * (-camOffset.X)
-
-	-- 2) Proyectar a viewport para calcular el error en píxeles respecto al centro
-	local viewportSize = cam.ViewportSize
-	if viewportSize.X == 0 or viewportSize.Y == 0 then
-		-- seguridad
-		cam.CFrame = CFrame.lookAt(eyePos, compensatedTarget)
+	-- Distancias
+	local distCamToTarget = (targetPos - eyePos).Magnitude
+	local dirHrpToTarget = (targetPos - hrpPos)
+	local distHrpToTarget = dirHrpToTarget.Magnitude
+	if distHrpToTarget <= 0.0001 or distCamToTarget <= 0.0001 then
+		-- fallback seguro
+		cam.CFrame = CFrame.lookAt(eyePos, targetPos, cam.CFrame.UpVector)
 		return
 	end
 
-	local screenX, screenY, onScreen = cam:WorldToViewportPoint(compensatedTarget)
-	-- center of screen in pixels
-	local centerX = viewportSize.X * 0.5
-	local centerY = viewportSize.Y * 0.5
+	-- Normalizar dirección desde HRP al target
+	local dirNorm = dirHrpToTarget / distHrpToTarget
 
-	-- diferencia en píxeles (positivo = target a la derecha/abajo)
-	local dx = screenX - centerX
-	local dy = screenY - centerY
+	-- Calcular punto sobre la línea HRP->target que esté a la misma distancia del ojo que el target
+	-- Es decir: P = HRP + dirNorm * distCamToTarget
+	local projectedPoint = hrpPos + dirNorm * distCamToTarget
 
-	-- si el target ya está en el centro, solo lookAt normal
-	if math.abs(dx) < 0.5 and math.abs(dy) < 0.5 then
-		cam.CFrame = CFrame.lookAt(eyePos, compensatedTarget, cam.CFrame.UpVector)
-		return
-	end
-
-	-- 3) Convertir desplazamiento de píxeles a corrección en dirección mundial
-	-- focal length (píxeles) usando FOV vertical
-	local fov = cam.FieldOfView or 70
-	local f = (viewportSize.Y * 0.5) / math.tan(math.rad(fov * 0.5))
-
-	-- correction vector in world space (Right positive moves view right, Up positive moves view up)
-	-- invert dy porque pantalla y espacio Y van en sentidos opuestos
-	local right = cam.CFrame.RightVector
-	local up = cam.CFrame.UpVector
-
-	local correctionWorld = right * (dx / f) + up * (-dy / f)
-
-	-- 4) Aplicar la corrección a la dirección de mirada (pequeña aproximación lineal)
-	local lookVec = cam.CFrame.LookVector
-	local newDir = (lookVec - correctionWorld).Unit
-
-	-- 5) Mantener distancia al objetivo (para evitar mover la cámara)
-	local dist = (compensatedTarget - eyePos).Magnitude
-	local newLookAt = eyePos + newDir * dist
-
-	-- Aplicar CFrame manteniendo el up original para evitar roll extraño
-	cam.CFrame = CFrame.new(eyePos, newLookAt, cam.CFrame.UpVector)
+	-- Finalmente, orientamos la cámara de modo que mire EXACTAMENTE a `projectedPoint`.
+	-- Esto alinea la dirección vista en pantalla (centro) con la dirección HRP->target
+	-- sin «re-centrar» el objetivo erróneamente ni mezclar compensaciones contradictorias.
+	cam.CFrame = CFrame.new(eyePos, projectedPoint, cam.CFrame.UpVector)
 end
-
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
