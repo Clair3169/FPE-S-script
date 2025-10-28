@@ -110,7 +110,7 @@ local function lockCameraToTargetPart(targetPart)
 	-- Si el shiftlock está activo, compensamos el desplazamiento lateral
 	if isShiftLockEnabled() then
 		local rightVector = cam.CFrame.RightVector
-		camPos = camPos + (rightVector * -2) -- ajusta este valor (entre -1.5 y -3) hasta que se centre perfecto
+		camPos = camPos + (rightVector * -3) -- ajusta este valor (entre -1.5 y -3) hasta que se centre perfecto
 	end
 
 	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
