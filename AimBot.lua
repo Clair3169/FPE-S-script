@@ -88,8 +88,9 @@ local function getTargetPartByPriority(model, priorityList)
 	end
 	return nil
 end
+
 -- =====================================================
--- 🔒 FUNCIÓN DE CÁMARA (compensa offset lateral del shiftlock)
+-- 🔒 FUNCIÓN DE CÁMARA (Compensación precisa en pantalla + offset hombro)
 -- =====================================================
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera or not Players.LocalPlayer then return end
@@ -102,20 +103,57 @@ local function lockCameraToTargetPart(targetPart)
 	local hrp = char.HumanoidRootPart
 	local eyePos = cam.CFrame.Position
 
-	-- Calcular el offset de la cámara respecto al HRP (por ejemplo, el hombro)
+	-- 1) Compensación sencilla por offset lateral del hombro (si existe)
 	local camOffset = hrp.CFrame:PointToObjectSpace(eyePos)
+	local compensatedTarget = targetPos + hrp.CFrame.RightVector * (-camOffset.X)
 
-	-- Si la cámara está desplazada lateralmente (shiftlock), el eje X del offset lo refleja.
-	-- Compensamos ese desplazamiento aplicando la misma magnitud al objetivo,
-	-- pero en dirección opuesta en el espacio del HRP.
-	local correctedTargetPos = targetPos + hrp.CFrame.RightVector * (-camOffset.X)
+	-- 2) Proyectar a viewport para calcular el error en píxeles respecto al centro
+	local viewportSize = cam.ViewportSize
+	if viewportSize.X == 0 or viewportSize.Y == 0 then
+		-- seguridad
+		cam.CFrame = CFrame.lookAt(eyePos, compensatedTarget)
+		return
+	end
 
-	-- Mantener el mismo upVector para no alterar el pitch o roll de la cámara
-	local upVec = cam.CFrame.UpVector or Vector3.new(0, 1, 0)
+	local screenX, screenY, onScreen = cam:WorldToViewportPoint(compensatedTarget)
+	-- center of screen in pixels
+	local centerX = viewportSize.X * 0.5
+	local centerY = viewportSize.Y * 0.5
 
-	-- Ahora mirar al punto corregido (compensando el lado del hombro)
-	cam.CFrame = CFrame.lookAt(eyePos, correctedTargetPos, upVec)
+	-- diferencia en píxeles (positivo = target a la derecha/abajo)
+	local dx = screenX - centerX
+	local dy = screenY - centerY
+
+	-- si el target ya está en el centro, solo lookAt normal
+	if math.abs(dx) < 0.5 and math.abs(dy) < 0.5 then
+		cam.CFrame = CFrame.lookAt(eyePos, compensatedTarget, cam.CFrame.UpVector)
+		return
+	end
+
+	-- 3) Convertir desplazamiento de píxeles a corrección en dirección mundial
+	-- focal length (píxeles) usando FOV vertical
+	local fov = cam.FieldOfView or 70
+	local f = (viewportSize.Y * 0.5) / math.tan(math.rad(fov * 0.5))
+
+	-- correction vector in world space (Right positive moves view right, Up positive moves view up)
+	-- invert dy porque pantalla y espacio Y van en sentidos opuestos
+	local right = cam.CFrame.RightVector
+	local up = cam.CFrame.UpVector
+
+	local correctionWorld = right * (dx / f) + up * (-dy / f)
+
+	-- 4) Aplicar la corrección a la dirección de mirada (pequeña aproximación lineal)
+	local lookVec = cam.CFrame.LookVector
+	local newDir = (lookVec - correctionWorld).Unit
+
+	-- 5) Mantener distancia al objetivo (para evitar mover la cámara)
+	local dist = (compensatedTarget - eyePos).Magnitude
+	local newLookAt = eyePos + newDir * dist
+
+	-- Aplicar CFrame manteniendo el up original para evitar roll extraño
+	cam.CFrame = CFrame.new(eyePos, newLookAt, cam.CFrame.UpVector)
 end
+
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
