@@ -90,18 +90,28 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 -- =====================================================
--- 🎯 FUNCIÓN DE CÁMARA (Apunta directo al centro del target)
+-- 🔒 FUNCIÓN DE CÁMARA (Corrige el desplazamiento lateral del shift-lock)
 -- =====================================================
 local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera then return end
+	if not targetPart or not Workspace.CurrentCamera or not Players.LocalPlayer then return end
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
 	local eyePos = cam.CFrame.Position
+	local upVec = cam.CFrame.UpVector
 
-	-- La cámara se orienta directamente hacia el centro del target
-	-- No se aplica ninguna compensación lateral ni de paralaje.
-	cam.CFrame = CFrame.lookAt(eyePos, targetPos, Vector3.new(0, 1, 0))
+	-- Calcular vector hacia el target
+	local dirToTarget = (targetPos - eyePos).Unit
+	local distToTarget = (targetPos - eyePos).Magnitude
+
+	-- 💡 Corrige el desplazamiento lateral del hombro (shiftlock)
+	-- Mueve la cámara un poco hacia la izquierda del personaje
+	-- Ajustá este valor según el juego: 1 = 1 stud (~normal shoulder offset)
+	local lateralCorrection = -1 -- negativo = mover hacia la izquierda
+	local correctedEyePos = eyePos + cam.CFrame.RightVector * lateralCorrection
+
+	-- Vuelve a apuntar desde la nueva posición hacia el centro del target
+	cam.CFrame = CFrame.lookAt(correctedEyePos, targetPos, upVec)
 end
 
 local function isTimerVisible()
