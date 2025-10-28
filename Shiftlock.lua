@@ -29,8 +29,8 @@ local States = {
 }
 
 local MaxLength = 900000
-local EnabledOffset = CFrame.new(1.7, 0, 0)
-local DisabledOffset = CFrame.new(-1.7, 0, 0)
+local EnabledOffset = CFrame.new(1.5, 0, 0)
+local DisabledOffset = CFrame.new(-1.5, 0, 0)
 local Active
 
 ShiftLockScreenGui.Name = "Shiftlock (CoreGui)"
