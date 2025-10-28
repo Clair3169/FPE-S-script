@@ -96,7 +96,7 @@ end
 -- =====================================================
 
 -- Ajuste lateral manual (positivo = derecha, negativo = izquierda)
-local SHIFTLOCK_X_ADJUST = -1.7 -- ajusta este valor hasta centrar el aimbot en ShiftLock
+local SHIFTLOCK_X_ADJUST = 0 -- ajusta este valor hasta centrar el aimbot en ShiftLock
 
 -- Detección del estado del ShiftLock personalizado
 local function isShiftLockActive()
