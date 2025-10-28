@@ -90,45 +90,18 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 -- =====================================================
--- 🔒 FUNCIÓN DE CÁMARA (Corrección de paralaje consistente)
+-- 🎯 FUNCIÓN DE CÁMARA (Apunta directo al centro del target)
 -- =====================================================
 local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera or not Players.LocalPlayer then return end
+	if not targetPart or not Workspace.CurrentCamera then return end
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
-
-	-- Preferir un origen de disparo conocido; usar HumanoidRootPart por defecto
-	local char = Players.LocalPlayer.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	-- Posiciones relevantes
 	local eyePos = cam.CFrame.Position
-	local hrpPos = hrp.Position
 
-	-- Distancias
-	local distCamToTarget = (targetPos - eyePos).Magnitude
-	local dirHrpToTarget = (targetPos - hrpPos)
-	local distHrpToTarget = dirHrpToTarget.Magnitude
-	if distHrpToTarget <= 0.0001 or distCamToTarget <= 0.0001 then
-		-- fallback seguro
-		cam.CFrame = CFrame.lookAt(eyePos, targetPos, cam.CFrame.UpVector)
-		return
-	end
-
-	-- Normalizar dirección desde HRP al target
-	local dirNorm = dirHrpToTarget / distHrpToTarget
-
-	-- Calcular punto sobre la línea HRP->target que esté a la misma distancia del ojo que el target
-	-- Es decir: P = HRP + dirNorm * distCamToTarget
-	local projectedPoint = hrpPos + dirNorm * distCamToTarget
-
-	-- Finalmente, orientamos la cámara de modo que mire EXACTAMENTE a `projectedPoint`.
-	-- Esto alinea la dirección vista en pantalla (centro) con la dirección HRP->target
-	-- sin «re-centrar» el objetivo erróneamente ni mezclar compensaciones contradictorias.
-	cam.CFrame = CFrame.new(eyePos, projectedPoint, cam.CFrame.UpVector)
+	-- La cámara se orienta directamente hacia el centro del target
+	-- No se aplica ninguna compensación lateral ni de paralaje.
+	cam.CFrame = CFrame.lookAt(eyePos, targetPos, Vector3.new(0, 1, 0))
 end
 
 local function isTimerVisible()
