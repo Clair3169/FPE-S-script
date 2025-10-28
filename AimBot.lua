@@ -22,12 +22,6 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local circleActive = false
--- 📷 Control interno de la cámara del aimbot
-local cameraOverridden = false
-local prevCameraType = nil
-local prevCameraSubject = nil
-local prevCameraCFrame = nil
-local camOffset = nil -- offset entre cámara y jugador para mantener seguimiento
 
 -- Reutilizar RaycastParams para evitar asignaciones por cada comprobación
 local rayParams = RaycastParams.new()
@@ -80,8 +74,6 @@ local function getModelsFromFolders(folderList)
 	return models
 end
 
-
-
 -- Obtiene la parte objetivo, revisando prioridades (intento directo + fallback recursivo)
 local function getTargetPartByPriority(model, priorityList)
 	for _, name in ipairs(priorityList) do
@@ -97,90 +89,20 @@ local function getTargetPartByPriority(model, priorityList)
 	return nil
 end
 
--- 📸 Toma control de la cámara y calcula el offset respecto al jugador
-local function overrideCamera()
-	if not Workspace.CurrentCamera or cameraOverridden then return end
-	local cam = Workspace.CurrentCamera
-	local char = LocalPlayer and LocalPlayer.Character
-	if not char then return end
 
-	-- Guardar estado anterior
-	prevCameraType = cam.CameraType
-	prevCameraSubject = cam.CameraSubject
-	prevCameraCFrame = cam.CFrame
-
-	-- Buscar parte base del personaje
-	local root = char:FindFirstChild("HumanoidRootPart") 
-		or char:FindFirstChild("UpperTorso") 
-		or char:FindFirstChild("Torso") 
-		or char:FindFirstChild("Head")
-	if not root then return end
-
-	-- Calcular distancia actual entre cámara y jugador
-	camOffset = cam.CFrame.Position - root.Position
-
-	-- Poner la cámara en modo scriptable (ningún otro script podrá moverla)
-	pcall(function()
-		cam.CameraType = Enum.CameraType.Scriptable
-	end)
-
-	cameraOverridden = true
-end
-
--- 🔁 Devuelve el control de la cámara al juego cuando terminas de apuntar
-local function restoreCamera()
-	local cam = Workspace.CurrentCamera
-	if not cam or not cameraOverridden then return end
-
-	pcall(function()
-		if prevCameraType then
-			cam.CameraType = prevCameraType
-		end
-		if prevCameraSubject then
-			cam.CameraSubject = prevCameraSubject
-		end
-	end)
-
-	-- (No restauramos el CFrame exacto para evitar "saltos bruscos")
-
-	cameraOverridden = false
-	prevCameraType = nil
-	prevCameraSubject = nil
-	prevCameraCFrame = nil
-	camOffset = nil
-end
-
--- 🎯 Fija la cámara mirando al objetivo sin romper el movimiento del jugador
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 	local cam = Workspace.CurrentCamera
-	local char = LocalPlayer and LocalPlayer.Character
-	if not char then return end
-
-	-- Asegurar que la cámara está bajo nuestro control
-	if not cameraOverridden or not camOffset then
-		overrideCamera()
-		if not camOffset then return end
-	end
-
-	-- Buscar parte base del jugador
-	local root = char:FindFirstChild("HumanoidRootPart") 
-		or char:FindFirstChild("UpperTorso") 
-		or char:FindFirstChild("Torso") 
-		or char:FindFirstChild("Head")
+	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	-- La cámara sigue la posición del jugador manteniendo la misma distancia
-	local camPos = root.Position + camOffset
+	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
+	local camPos = cam.CFrame.Position
+	local targetPos = targetPart.Position
 
-	-- Apunta hacia el objetivo (centro del target)
-	local newCFrame = CFrame.lookAt(camPos, targetPart.Position)
-
-	pcall(function()
-		cam.CFrame = newCFrame
-	end)
+	-- Mantenemos la orientación actual del shiftlock
+	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
 end
-
 
 
 
@@ -469,15 +391,11 @@ local function runAimbot()
 	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
 end
 
+-- Para el loop del Aimbot
 local function stopAimbot()
-	if not isAimbotRunning then return end
-	pcall(function()
-		RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
-	end)
+	if not isAimbotRunning then return end -- No está corriendo
+	RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
 	isAimbotRunning = false
-
-	-- ✅ Restaurar cámara al terminar
-	restoreCamera()
 end
 
 -- Limpia conexiones de activación automáticas
