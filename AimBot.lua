@@ -90,25 +90,26 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 -- =====================================================
--- 🔒 FUNCIÓN DE CÁMARA (CORREGIDA - MÉTODO AGRESIVO)
+-- 🔒 FUNCIÓN DE CÁMARA (SIMPLE - sin cambiar CameraType)
 -- =====================================================
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 
 	local cam = Workspace.CurrentCamera
 	local targetPos = targetPart.Position
-	
-	-- 1. Obtenemos la posición actual de la cámara (el "hombro" o eyePos)
-	--    Esto es crucial. Lo leemos DESPUÉS de que el script del juego lo haya movido.
-	local eyePos = cam.CFrame.Position 
-	
-	-- 2. FORZAMOS el CFrame
-	--    Le decimos a la cámara: "Quédate en esta posición (eyePos),
-	--    pero mira EXACTAMENTE a esta otra posición (targetPos)".
-	--    Esto es más directo y anula cualquier cálculo anterior.
-	cam.CFrame = CFrame.lookAt(eyePos, targetPos)
-end
 
+	-- Leer la posición actual de la cámara (ojo) y su upVector actual
+	local eyePos = cam.CFrame.Position
+	local upVec = cam.CFrame.UpVector or Vector3.new(0,1,0)
+
+	-- Si la distancia es prácticamente cero, evitar trabajar
+	if (targetPos - eyePos).Magnitude <= 0.0001 then return end
+
+	-- Usar lookAt pero preservando el upVector actual de la cámara.
+	-- Esto orienta la cámara para mirar EXACTAMENTE al centro del target,
+	-- manteniendo la rotación "vertical" que ya tenía el juego (evita desvíos laterales).
+	cam.CFrame = CFrame.lookAt(eyePos, targetPos, upVec)
+end
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
