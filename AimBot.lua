@@ -90,20 +90,42 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 
-local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera then return end
-	local cam = Workspace.CurrentCamera
-	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
 
-	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
-	local camPos = cam.CFrame.Position
-	local targetPos = targetPart.Position
-
-	-- Mantenemos la orientación actual del shiftlock
-	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
+local function isShiftLockActive()
+    return UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
 end
 
+local function getShiftLockCameraPosition()
+    -- Intenta usar la posición del ShoulderRight para seguir la cámara
+    local char = game.Players.LocalPlayer.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local rightShoulder = char:FindFirstChild("RightUpperArm") or char:FindFirstChild("RightArm")
+    if rightShoulder then
+        return rightShoulder.Position + Vector3.new(0, 0.5, 0) -- offset visual
+    elseif root then
+        return root.Position + Vector3.new(1, 1.5, 0) -- fallback
+    end
+    return nil
+end
+
+local function lockCameraToTargetShiftLock(targetPart)
+    if not targetPart then return end
+
+    local camPos
+    if isShiftLockActive() then
+        camPos = getShiftLockCameraPosition()
+    else
+        camPos = Camera.CFrame.Position
+    end
+    if not camPos then return end
+
+    -- Apunta la cámara al objetivo desde la posición calculada
+    Camera.CFrame = CFrame.lookAt(camPos, targetPart.Position, Vector3.new(0,1,0))
+end
 
 
 local function isTimerVisible()
