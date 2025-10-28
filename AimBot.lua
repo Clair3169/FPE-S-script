@@ -92,24 +92,16 @@ end
 
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
-
 	local cam = Workspace.CurrentCamera
+	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
 	local camPos = cam.CFrame.Position
-	local camRight = cam.CFrame.RightVector
+	local targetPos = targetPart.Position
 
-	-- Compensación lateral si ShiftLock activo
-	local shiftGui = game:GetService("CoreGui"):FindFirstChild("Shiftlock (CoreGui)")
-	local shiftOn = false
-	if shiftGui then
-		local cursor = shiftGui:FindFirstChild("ShiftlockCursor")
-		shiftOn = cursor and cursor.Visible
-	end
-
-	-- Aplica una corrección lateral (ajustable)
-	local offset = shiftOn and (camRight * 1.7) or Vector3.zero
-	local correctedPos = camPos + offset
-
-	cam.CFrame = CFrame.lookAt(correctedPos, targetPart.Position)
+	-- Mantenemos la orientación actual del shiftlock
+	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
 end
 
 
