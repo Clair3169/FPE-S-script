@@ -106,7 +106,7 @@ local function lockCameraToTargetPart(targetPart)
 	end
 
 	-- Aplica una corrección lateral (ajustable)
-	local offset = shiftOn and (camRight * -1.7) or Vector3.zero
+	local offset = shiftOn and (camRight * 1.7) or Vector3.zero
 	local correctedPos = camPos + offset
 
 	cam.CFrame = CFrame.lookAt(correctedPos, targetPart.Position)
