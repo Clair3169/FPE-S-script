@@ -90,40 +90,26 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 
-
--- =====================================================
--- 🎯 Función ajustable con compensación para ShiftLock
--- =====================================================
-
--- Ajuste lateral manual (positivo = derecha, negativo = izquierda)
-local SHIFTLOCK_X_ADJUST = 1 -- ajusta este valor hasta centrar el aimbot en ShiftLock
-
--- Detección del estado del ShiftLock personalizado
-local function isShiftLockActive()
-	local gui = game:GetService("CoreGui"):FindFirstChild("Shiftlock (CoreGui)")
-	if not gui then return false end
-	local cursor = gui:FindFirstChild("ShiftlockCursor")
-	return cursor and cursor.Visible
-end
-
--- Versión mejorada de lockCameraToTargetPart
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
+
 	local cam = Workspace.CurrentCamera
 	local camPos = cam.CFrame.Position
+	local camRight = cam.CFrame.RightVector
 
-	-- Si el ShiftLock está activo, aplica una corrección lateral ajustable
-	if isShiftLockActive() then
-		-- Mueve el punto de origen lateralmente (izquierda/derecha)
-		camPos = camPos + (cam.CFrame.RightVector * SHIFTLOCK_X_ADJUST)
+	-- Compensación lateral si ShiftLock activo
+	local shiftGui = game:GetService("CoreGui"):FindFirstChild("Shiftlock (CoreGui)")
+	local shiftOn = false
+	if shiftGui then
+		local cursor = shiftGui:FindFirstChild("ShiftlockCursor")
+		shiftOn = cursor and cursor.Visible
 	end
 
-	-- CFrame apuntando al objetivo (usa el eje Y para mantener el "up" correcto)
-	local look = CFrame.lookAt(camPos, targetPart.Position, Vector3.new(0, 1, 0))
-	cam.CFrame = look
-	pcall(function()
-		cam.Focus = CFrame.new(targetPart.Position)
-	end)
+	-- Aplica una corrección lateral (ajustable)
+	local offset = shiftOn and (camRight * -1.7) or Vector3.zero
+	local correctedPos = camPos + offset
+
+	cam.CFrame = CFrame.lookAt(correctedPos, targetPart.Position)
 end
 
 
