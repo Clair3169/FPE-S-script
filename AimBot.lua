@@ -89,13 +89,32 @@ local function getTargetPartByPriority(model, priorityList)
 	return nil
 end
 
-
+-- Reemplaza tu función lockCameraToTargetPart por esta:
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 	local cam = Workspace.CurrentCamera
+	-- Mantener la posición actual de la cámara
 	local camPos = cam.CFrame.Position
-	cam.CFrame = CFrame.lookAt(camPos, targetPart.Position)
+
+	-- Nuevo CFrame mirando al objetivo (preserva up = Y)
+	local newCFrame = CFrame.lookAt(camPos, targetPart.Position, Vector3.new(0, 1, 0))
+
+	-- Aplicar CFrame y sincronizar Focus para evitar offsets de pivot/shiftlock
+	cam.CFrame = newCFrame
+	-- Camera.Focus es un CFrame; alinear el focus al objetivo reduce desvíos en modos especiales
+	pcall(function() cam.Focus = CFrame.new(targetPart.Position) end)
 end
+
+-- Y en runAimbot cambia la prioridad al valor de Camera:
+local function runAimbot()
+	if isAimbotRunning then return end
+	isAimbotRunning = true
+
+	-- Usa prioridad de cámara (mejor para casos con ShiftLock)
+	local camPriority = Enum.RenderPriority.Camera.Value
+	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
+end
+
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
