@@ -90,19 +90,32 @@ local function getTargetPartByPriority(model, priorityList)
 end
 
 
+local UserSettings = UserSettings()
+local UserGameSettings = UserSettings.GameSettings
+
+local function isShiftLockEnabled()
+	return UserGameSettings and UserGameSettings.ControlMode == Enum.ControlMode.MouseLockSwitch
+end
+
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 	local cam = Workspace.CurrentCamera
-	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local char = LocalPlayer.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
 	local camPos = cam.CFrame.Position
 	local targetPos = targetPart.Position
 
-	-- Mantenemos la orientación actual del shiftlock
+	-- Si el shiftlock está activo, compensamos el desplazamiento lateral
+	if isShiftLockEnabled() then
+		local rightVector = cam.CFrame.RightVector
+		camPos = camPos + (rightVector * -2) -- ajusta este valor (entre -1.5 y -3) hasta que se centre perfecto
+	end
+
 	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
 end
+
 
 
 
