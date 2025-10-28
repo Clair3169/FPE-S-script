@@ -96,12 +96,20 @@ local function lockCameraToTargetPart(targetPart)
 	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
+	-- Posición actual de la cámara y del root
 	local camPos = cam.CFrame.Position
-	local targetPos = targetPart.Position
+	local rootCFrame = root.CFrame
 
-	-- Mantenemos la orientación actual del shiftlock
-	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
+	-- Calculamos el offset de la cámara respecto al root en espacio local del root.
+	-- Esto preserva la "posición de shiftlock" (por ejemplo X positivo = derecha).
+	local localOffset = rootCFrame:PointToObjectSpace(camPos)
+
+	-- Reconstruimos la posición de la cámara en world-space preservando ese offset
+	local newCamPos = rootCFrame:PointToWorldSpace(localOffset)
+
+	-- Finalmente, hacemos que la cámara mire al centro del target (targetPart.Position)
+	-- y usamos el UpVector del root para mantener la verticalidad.
+	cam.CFrame = CFrame.lookAt(newCamPos, targetPart.Position, root.CFrame.UpVector)
 end
 
 
