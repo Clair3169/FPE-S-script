@@ -52,7 +52,7 @@ ShiftlockCursor.Parent = ShiftLockScreenGui
 ShiftlockCursor.Image = States.Lock
 ShiftlockCursor.AnchorPoint = Vector2.new(0.5, 0.5)
 ShiftlockCursor.BackgroundTransparency = 1
-ShiftlockCursor.Visible = false
+ShiftlockCursor.Visible = false -- Se mantiene en false
 ShiftlockCursor.Size = UDim2.new(0, 27, 0, 27)
 
 local verticalOffset = -57 -- de abajo a arriba
@@ -76,13 +76,15 @@ local uiScale = frame and frame:FindFirstChildOfClass("UIScale")
 local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
 
 RunService.RenderStepped:Connect(function()
-	if not ShiftlockCursor.Visible then return end
+	-- Esta función ya no hará nada porque ShiftlockCursor.Visible siempre es false
+	if not ShiftlockCursor.Visible then return end 
+	
 	if fakeCursorAttachment and camera then
 		local worldPos = fakeCursorAttachment.WorldPosition
 		local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
 		if onScreen then
 			ShiftlockCursor.Position = UDim2.fromOffset(centerX + horizontalOffset, centerY + verticalOffset)
-			ShiftlockCursor.Visible = false -- estaba en true
+			ShiftlockCursor.Visible = false 
 		else
 			ShiftlockCursor.Visible = false
 		end
@@ -93,11 +95,13 @@ RunService.RenderStepped:Connect(function()
 		if math.abs(uiScale.Scale - 1.4) < 0.05 then
 			ShiftlockCursor.Visible = false
 		else
-			ShiftlockCursor.Visible = false -- estaba en true
+			ShiftlockCursor.Visible = false
 		end
 	end
 end)
 
+-- Esta es la lógica que pediste: si el grosor cambia a 1.5, el frame se hace visible.
+-- Esta parte ya estaba en tu script original y es correcta.
 if uiStroke then
 	uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
 		if uiStroke.Thickness == 1.5 then
@@ -112,10 +116,17 @@ local function toggleShiftLock()
 			if player.Character and player.Character:FindFirstChild("Humanoid") then
 				player.Character.Humanoid.AutoRotate = false
 				ShiftLockButton.Image = States.On
-				ShiftlockCursor.Visible = true
-				if frame and uiStroke and uiStroke.Thickness ~= 1.5 then
+				
+				-- >> CAMBIO 1: Se asegura que el cursor sea invisible al activar ShiftLock
+				ShiftlockCursor.Visible = false 
+				
+				-- >> CAMBIO 2: Se pone el frame invisible SIEMPRE que se activa ShiftLock.
+				-- La otra función (GetPropertyChangedSignal) se encargará de volverlo
+				-- visible si el "Thickness" es 1.5.
+				if frame then
 					frame.Visible = false
 				end
+				
 				if player.Character:FindFirstChild("HumanoidRootPart") then
 					local root = player.Character.HumanoidRootPart
 					root.CFrame = CFrame.new(
@@ -141,10 +152,16 @@ local function toggleShiftLock()
 		end
 		ShiftLockButton.Image = States.Off
 		camera.CFrame = camera.CFrame * DisabledOffset
-		ShiftlockCursor.Visible = false
+		
+		-- El cursor también se mantiene invisible al desactivar
+		ShiftlockCursor.Visible = false 
+		
+		-- Esta es la lógica original para cuando se desactiva,
+		-- la cual vuelve a hacer visible el frame.
 		if frame and uiStroke and uiStroke.Thickness ~= 1.5 then
 			frame.Visible = true
 		end
+		
 		pcall(function()
 			Active:Disconnect()
 			Active = nil
