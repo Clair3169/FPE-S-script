@@ -114,7 +114,7 @@ local function toggleShiftLock()
 				ShiftLockButton.Image = States.On
 				ShiftlockCursor.Visible = true
 				if frame and uiStroke and uiStroke.Thickness ~= 1.5 then
-					frame.Visible = true -- estba en false
+					frame.Visible = false
 				end
 				if player.Character:FindFirstChild("HumanoidRootPart") then
 					local root = player.Character.HumanoidRootPart
