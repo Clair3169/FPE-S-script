@@ -104,8 +104,14 @@ end)
 -- Esta parte ya estaba en tu script original y es correcta.
 if uiStroke then
 	uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
+		if not frame then return end
+		
+		-- Cuando el grosor sea exactamente 1.5 → visible TRUE
 		if uiStroke.Thickness == 1.5 then
-			if frame then frame.Visible = true end
+			frame.Visible = true
+		else
+			-- Cuando cambie a cualquier otro valor → visible FALSE
+			frame.Visible = false
 		end
 	end)
 end
