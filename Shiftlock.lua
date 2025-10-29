@@ -20,12 +20,11 @@ end
 local ShiftLockScreenGui = Instance.new("ScreenGui")
 local ShiftLockButton = Instance.new("ImageButton")
 local ShiftlockCursor = Instance.new("ImageLabel")
--- rbxassetid://18969983652 (id puntero)
 
 local States = {
 	Off = "rbxassetid://70491444431002",
 	On = "rbxassetid://139177094823080",
-	Lock = "",
+	Lock = "rbxassetid://18969983652",
 	Lock2 = "rbxasset://SystemCursors/Cross"
 }
 
@@ -83,7 +82,7 @@ RunService.RenderStepped:Connect(function()
 		local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
 		if onScreen then
 			ShiftlockCursor.Position = UDim2.fromOffset(centerX + horizontalOffset, centerY + verticalOffset)
-			ShiftlockCursor.Visible = true
+			ShiftlockCursor.Visible = false -- estaba en true
 		else
 			ShiftlockCursor.Visible = false
 		end
@@ -94,7 +93,7 @@ RunService.RenderStepped:Connect(function()
 		if math.abs(uiScale.Scale - 1.4) < 0.05 then
 			ShiftlockCursor.Visible = false
 		else
-			ShiftlockCursor.Visible = true
+			ShiftlockCursor.Visible = false -- estaba en true
 		end
 	end
 end)
@@ -115,7 +114,7 @@ local function toggleShiftLock()
 				ShiftLockButton.Image = States.On
 				ShiftlockCursor.Visible = true
 				if frame and uiStroke and uiStroke.Thickness ~= 1.5 then
-					frame.Visible = false
+					frame.Visible = true -- estba en false
 				end
 				if player.Character:FindFirstChild("HumanoidRootPart") then
 					local root = player.Character.HumanoidRootPart
