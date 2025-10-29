@@ -103,15 +103,24 @@ end)
 -- Esta es la lógica que pediste: si el grosor cambia a 1.5, el frame se hace visible.
 -- Esta parte ya estaba en tu script original y es correcta.
 if uiStroke then
+	local lastVisible = false
+	local TOLERANCE = 0.1 -- margen para evitar que se oculte por pequeños cambios
+
 	uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
 		if not frame then return end
-		
-		-- Cuando el grosor sea exactamente 1.5 → visible TRUE
-		if uiStroke.Thickness == 1.5 then
-			frame.Visible = true
+
+		-- Si el grosor está cerca de 1.5 (por ejemplo 1.45–1.55)
+		if math.abs(uiStroke.Thickness - 1.5) <= TOLERANCE then
+			if not lastVisible then
+				frame.Visible = true
+				lastVisible = true
+			end
 		else
-			-- Cuando cambie a cualquier otro valor → visible FALSE
-			frame.Visible = false
+			-- Solo se apaga si se aleja realmente de 1.5
+			if lastVisible then
+				frame.Visible = false
+				lastVisible = false
+			end
 		end
 	end)
 end
