@@ -20,11 +20,12 @@ end
 local ShiftLockScreenGui = Instance.new("ScreenGui")
 local ShiftLockButton = Instance.new("ImageButton")
 local ShiftlockCursor = Instance.new("ImageLabel")
+-- rbxassetid://18969983652 (id puntero)
 
 local States = {
 	Off = "rbxassetid://70491444431002",
 	On = "rbxassetid://139177094823080",
-	Lock = "rbxassetid://18969983652",
+	Lock = "",
 	Lock2 = "rbxasset://SystemCursors/Cross"
 }
 
