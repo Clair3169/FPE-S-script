@@ -32,6 +32,40 @@ Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 	Camera = Workspace.CurrentCamera
 end)
 
+-- ===== Cámara: seguimiento al jugador + apuntado al objetivo (simple) =====
+local _cameraFollowConn = nil
+local _cameraFollowTarget = nil
+
+local function _cameraFollowUpdate()
+	if not _cameraFollowTarget or not _cameraFollowTarget.Parent then return end
+	local cam = Workspace and Workspace.CurrentCamera
+	if not cam then return end
+	-- Mantener la posición que Roblox controla y solo rotar la cámara hacia el objetivo
+	local camPos = cam.CFrame.Position
+	local lookCFrame = CFrame.lookAt(camPos, _cameraFollowTarget.Position, Vector3.new(0,1,0))
+	-- Lerp ligero para no pelear con la cámara nativa
+	cam.CFrame = cam.CFrame:Lerp(lookCFrame, 0.35)
+end
+
+local function startCameraFollow(part)
+	if not part or not part:IsA("BasePart") then return end
+	_cameraFollowTarget = part
+	-- Si ya estaba binded, no bindear otra vez
+	if _cameraFollowConn then return end
+	-- Usamos prioridad justo por encima de la cámara nativa
+	_cameraFollowConn = RunService:BindToRenderStep("AimbotCameraFollow", Enum.RenderPriority.Camera.Value + 1, _cameraFollowUpdate)
+end
+
+local function stopCameraFollow()
+	if _cameraFollowConn then
+		RunService:UnbindFromRenderStep("AimbotCameraFollow")
+		_cameraFollowConn = nil
+	end
+	_cameraFollowTarget = nil
+end
+-- =======================================================================
+
+
 -- =====================================================
 -- 🔧 FUNCIONES UTILITARIAS
 -- =====================================================
@@ -88,23 +122,6 @@ local function getTargetPartByPriority(model, priorityList)
 	end
 	return nil
 end
-
-
-local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera then return end
-	local cam = Workspace.CurrentCamera
-	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
-	local camPos = cam.CFrame.Position
-	local targetPos = targetPart.Position
-
-	-- Mantenemos la orientación actual del shiftlock
-	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
-end
-
-
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
@@ -335,6 +352,8 @@ local function aimbotUpdateFunction()
 		-- Si no somos elegibles, paramos el loop
 		RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
 		isAimbotRunning = false
+		-- Asegurar que la cámara deje de forzarse
+		pcall(stopCameraFollow)
 		return
 	end
 
@@ -375,8 +394,15 @@ local function aimbotUpdateFunction()
 	if currentTarget and currentMode then
 		local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
 		if part then
-			lockCameraToTargetPart(part)
+			-- iniciar el seguimiento que apunta al target pero mantiene el follow nativo
+			startCameraFollow(part)
+		else
+			-- si no hay parte válida, detener follow
+			stopCameraFollow()
 		end
+	else
+		-- no hay target: detener follow
+		stopCameraFollow()
 	end
 end
 
@@ -385,8 +411,7 @@ local function runAimbot()
 	if isAimbotRunning then return end -- Ya está corriendo
 	isAimbotRunning = true
 	
-	-- Bindeamos la función para que se ejecute DESPUÉS de la cámara
-	-- Usa .Last.Value (2000) para máxima prioridad
+	-- Bindeamos la función para que se ejecute DESPUÉS de la cámara nativa
 	local camPriority = Enum.RenderPriority.Last.Value
 	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
 end
@@ -396,6 +421,8 @@ local function stopAimbot()
 	if not isAimbotRunning then return end -- No está corriendo
 	RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
 	isAimbotRunning = false
+	-- Asegurar detener el follow de la cámara
+	pcall(stopCameraFollow)
 end
 
 -- Limpia conexiones de activación automáticas
@@ -477,6 +504,8 @@ LocalPlayer.CharacterRemoving:Connect(function()
 	-- Limpiar también las conexiones de Circle
 	clearCharConnections()
 	circleActive = false
+	-- Detener seguimiento de cámara si estaba activo
+	pcall(stopCameraFollow)
 end)
 
 -- FIN
