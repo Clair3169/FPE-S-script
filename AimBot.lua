@@ -1,8 +1,3 @@
--- =====================================================
--- 🎯 Aimbot combinado optimizado (LibraryBook / Thavel / Circle / Bloomie)
--- Activación/desactivación completa y apuntado al centro del objetivo
--- =====================================================
-
 local AIM_PARTS = {
 	LibraryBook = {"HumanoidRootPart", "Torso", "UpperTorso"},
 	Thavel = {"UpperTorso", "Torso"},
@@ -10,7 +5,6 @@ local AIM_PARTS = {
 	Bloomie = {"Head", "Torso"}
 }
 
--- Máximo en studs para considerar un objetivo (ajusta si quieres más alcance)
 local MAX_TARGET_DISTANCE = 150
 
 repeat task.wait() until game:IsLoaded()
@@ -23,18 +17,12 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local circleActive = false
 
--- Reutilizar RaycastParams para evitar asignaciones por cada comprobación
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 
--- Actualizar cámara si se reinicia
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 	Camera = Workspace.CurrentCamera
 end)
-
--- =====================================================
--- 🔧 FUNCIONES UTILITARIAS
--- =====================================================
 
 local function hasLibraryBook(character)
 	if not character then return false end
@@ -74,7 +62,6 @@ local function getModelsFromFolders(folderList)
 	return models
 end
 
--- Obtiene la parte objetivo, revisando prioridades (intento directo + fallback recursivo)
 local function getTargetPartByPriority(model, priorityList)
 	for _, name in ipairs(priorityList) do
 		local part = model:FindFirstChild(name)
@@ -89,22 +76,15 @@ local function getTargetPartByPriority(model, priorityList)
 	return nil
 end
 
-
 local function lockCameraToTargetPart(targetPart)
 	if not targetPart or not Workspace.CurrentCamera then return end
 	local cam = Workspace.CurrentCamera
 	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
-
-	-- Calculamos dirección desde la posición actual de la cámara (no la del jugador)
 	local camPos = cam.CFrame.Position
 	local targetPos = targetPart.Position
-
-	-- Mantenemos la orientación actual del shiftlock
 	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
 end
-
-
 
 local function isTimerVisible()
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
@@ -120,12 +100,6 @@ local function isTimerVisible()
 	return timer.Visible
 end
 
--- =====================================================
--- 🧠 MODOS (LibraryBook / Thavel / Bloomie / Circle)
--- =====================================================
--- (Todo el código de getLibraryBookTargets, getThavelTargets, bindCircleDetection, etc. va aquí)
--- (Es idéntico al script anterior, no es necesario copiarlo si solo cambias la función de cámara)
--- ...
 local function getLibraryBookTargets()
 	local models = {}
 	local char = LocalPlayer and LocalPlayer.Character
@@ -178,19 +152,16 @@ local function bindCircleDetection(char)
 	clearCharConnections()
 	circleActive = checkCircleConditions(char)
 
-	-- Detectar cambios en atributos del Character (TeacherName)
 	local attrConn = char:GetAttributeChangedSignal("TeacherName"):Connect(function()
 		circleActive = checkCircleConditions(char)
 	end)
 	table.insert(charConnections, attrConn)
 
-	-- Detectar si el Character cambia de carpeta (Teachers u otra)
 	local parentConn = char:GetPropertyChangedSignal("Parent"):Connect(function()
 		circleActive = checkCircleConditions(char)
 	end)
 	table.insert(charConnections, parentConn)
 
-	-- Detectar cambios dentro del Humanoid (aparición/desaparición de SprintLock)
 	local humanoid = char:FindFirstChild("Humanoid")
 	if humanoid then
 		local addConn = humanoid.ChildAdded:Connect(function(child)
@@ -250,12 +221,6 @@ local function getBloomieTargets()
 	end
 	return models
 end
--- ... (Fin de la sección de modos)
-
-
--- =====================================================
--- 🎯 SELECCIÓN DE OBJETIVO (optimizada)
--- =====================================================
 
 local function chooseTarget(models, parts)
 	if not Camera then Camera = Workspace.CurrentCamera end
@@ -266,25 +231,20 @@ local function chooseTarget(models, parts)
 	local best = nil
 	local bestDist = math.huge
 
-	-- Actualizar filtro de raycast para ignorar al jugador local
 	if LocalPlayer.Character then
 		rayParams.FilterDescendantsInstances = { LocalPlayer.Character }
 	else
 		rayParams.FilterDescendantsInstances = {}
 	end
 
-
 	for _, model in ipairs(models) do
-		-- obtener la parte prioritaria
 		local part = getTargetPartByPriority(model, parts)
 		if part and part.Position then
 			local dir = part.Position - camPos
 			local dist = dir.Magnitude
 			if dist > 0 and dist <= MAX_TARGET_DISTANCE and dist < bestDist then
 				local dot = camLook:Dot(dir.Unit)
-				-- Sólo considerar si está razonablemente en frente
 				if dot > 0.6 then
-					-- Raycast para comprobar visibilidad (usa rayParams reutilizable)
 					local result = Workspace:Raycast(camPos, dir, rayParams)
 					local visible = not result or (result.Instance and result.Instance:IsDescendantOf(model))
 					if visible then
@@ -299,15 +259,10 @@ local function chooseTarget(models, parts)
 	return best
 end
 
--- =====================================================
--- 🧠 Activación / desactivación total del Aimbot (BindToRenderStep)
--- =====================================================
-
 local isAimbotRunning = false
-local AIMBOT_RENDER_NAME = "CustomAimbotLoop" -- Nombre para el loop de RenderStepped
+local AIMBOT_RENDER_NAME = "CustomAimbotLoop"
 local activationConns = {}
 
--- Comprueba si el jugador cumple algún requisito de modo
 local function isEligible()
 	local char = LocalPlayer and LocalPlayer.Character
 	if not char then return false end
@@ -317,7 +272,6 @@ local function isEligible()
 	local humanoid = char:FindFirstChild("Humanoid")
 	local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
 	
-	-- Comprobación rápida de condiciones
 	local isLibrary = (char.Parent and char.Parent.Name == "Students" and hasBook)
 	local isThavel = (teacher == "Thavel" and char:GetAttribute("Charging") == true)
 	local isCircle = (teacher == "Circle" and sprintLock and not isTimerVisible())
@@ -329,10 +283,8 @@ local function isEligible()
 	return false
 end
 
--- Función principal del Aimbot (loop por frame mientras está activo)
 local function aimbotUpdateFunction()
 	if not isEligible() then
-		-- Si no somos elegibles, paramos el loop
 		RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
 		isAimbotRunning = false
 		return
@@ -341,8 +293,6 @@ local function aimbotUpdateFunction()
 	local char = LocalPlayer and LocalPlayer.Character
 	if not char then return end
 
-	-- PRE-FILTER RÁPIDO: si claramente no cumples condiciones internas, evitar recolectar modelos
-	-- (Re-usamos isEligible que ya hace esto, pero verificamos rápido de nuevo)
 	local attrTeacher = char:GetAttribute("TeacherName")
 	local hasBook = hasLibraryBook(char)
 	local humanoid = char:FindFirstChild("Humanoid")
@@ -380,25 +330,20 @@ local function aimbotUpdateFunction()
 	end
 end
 
--- Inicia el loop del Aimbot
 local function runAimbot()
-	if isAimbotRunning then return end -- Ya está corriendo
+	if isAimbotRunning then return end
 	isAimbotRunning = true
 	
-	-- Bindeamos la función para que se ejecute DESPUÉS de la cámara
-	-- Usa .Last.Value (2000) para máxima prioridad
 	local camPriority = Enum.RenderPriority.Last.Value
 	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
 end
 
--- Para el loop del Aimbot
 local function stopAimbot()
-	if not isAimbotRunning then return end -- No está corriendo
+	if not isAimbotRunning then return end
 	RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
 	isAimbotRunning = false
 end
 
--- Limpia conexiones de activación automáticas
 local function clearActivationConns()
 	for _, c in ipairs(activationConns) do
 		if c and c.Disconnect then
@@ -408,18 +353,10 @@ local function clearActivationConns()
 	activationConns = {}
 end
 
--- =====================================================
--- 🎧 Sistema de escucha (enciende el aimbot cuando cumple requisitos)
--- =====================================================
-
 local function bindAutoActivation()
-	-- limpiar conexiones previas (si las hay)
 	clearActivationConns()
 
 	local function checkAndRun()
-		-- Esta función ahora es más simple:
-		-- Si somos elegibles y el loop no corre, iniciarlo.
-		-- La propia función 'aimbotUpdateFunction' se parará sola si dejamos de ser elegibles.
 		if not isAimbotRunning and isEligible() then
 			runAimbot()
 		end
@@ -428,23 +365,19 @@ local function bindAutoActivation()
 	local char = LocalPlayer and LocalPlayer.Character
 	if not char then return end
 
-	-- Escuchar varios cambios que puedan activar el modo: atributos relevantes y cambios del Character
 	table.insert(activationConns, char:GetAttributeChangedSignal("TeacherName"):Connect(checkAndRun))
 	table.insert(activationConns, char:GetAttributeChangedSignal("Charging"):Connect(checkAndRun))
 	table.insert(activationConns, char:GetAttributeChangedSignal("Aiming"):Connect(checkAndRun))
 
-	-- ChildAdded/Removed despiertan (herramientas, SprintLock, etc.)
 	table.insert(activationConns, char.ChildAdded:Connect(checkAndRun))
 	table.insert(activationConns, char.ChildRemoved:Connect(checkAndRun))
 
-	-- Si hay Humanoid, escuchar cambios internos por si aparece SprintLock
 	local humanoid = char:FindFirstChild("Humanoid")
 	if humanoid then
 		table.insert(activationConns, humanoid.ChildAdded:Connect(checkAndRun))
 		table.insert(activationConns, humanoid.ChildRemoved:Connect(checkAndRun))
 	end
 
-	-- Escuchar también cambios en el Timer
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
 	if pg then
 		local timer = pg:FindFirstChild("GameUI.Mobile.Alt.Timer", true)
@@ -453,30 +386,22 @@ local function bindAutoActivation()
 		end
 	end
 
-	-- Lanzamiento inicial
 	checkAndRun()
 end
 
--- Inicialización
 if LocalPlayer.Character then
 	bindAutoActivation()
 end
 
 LocalPlayer.CharacterAdded:Connect(function(char)
-	-- esperar un pelín a que se creen atributos y humanoid
 	task.wait(0.5)
 	bindAutoActivation()
-	-- Asegurarse de re-bindear la detección de Circle
 	bindCircleDetection(char)
 end)
 
 LocalPlayer.CharacterRemoving:Connect(function()
-	-- Desconectar aimbot si está corriendo y limpiar listeners
 	stopAimbot()
 	clearActivationConns()
-	-- Limpiar también las conexiones de Circle
 	clearCharConnections()
 	circleActive = false
 end)
-
--- FIN
