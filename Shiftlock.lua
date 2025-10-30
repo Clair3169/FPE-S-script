@@ -1,6 +1,7 @@
 -- =====================================================
 -- 🟣 ShiftLock con control persistente de Frame y UiStroke
 -- Mantiene el Frame visible cuando Thickness = 1.5 hasta que cambie
+-- v2 (Optimizada)
 -- =====================================================
 
 local Players = game:GetService("Players")
@@ -113,31 +114,40 @@ if uiStroke then
 	end
 end
 
--- 🧍‍♂️ Lógica de ShiftLock
+-- 🧍‍♂️ Lógica de ShiftLock (Optimizada)
 local function toggleShiftLock()
 	if not Active then
+		-- ⭐ [OPTIMIZACIÓN] Verificar personaje y humanoide ANTES de conectar el bucle
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		
+		if not humanoid then return end -- No activar si no hay humanoide
+
+		-- ⭐ [OPTIMIZACIÓN] Establecer propiedades UNA SOLA VEZ al activar
+		humanoid.AutoRotate = false
+		ShiftLockButton.Image = States.On
+		ShiftlockCursor.Visible = false -- Cursor invisible
+
+		-- Frame solo se oculta si no está controlado por Stroke
+		if frame and not frameControlledByStroke then
+			frame.Visible = false
+		end
+
+		-- ⭐ [OPTIMIZACIÓN] El bucle RenderStepped ahora SOLO hace lo esencial (actualizar CFrame)
 		Active = RunService.RenderStepped:Connect(function()
-			if player.Character and player.Character:FindFirstChild("Humanoid") then
-				player.Character.Humanoid.AutoRotate = false
-				ShiftLockButton.Image = States.On
-				ShiftlockCursor.Visible = false -- Cursor invisible
+			-- Volver a comprobar el RootPart por si el jugador muere/respawnea
+			local currentCharacter = player.Character
+			local root = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
 
-				-- Frame solo se oculta si no está controlado por Stroke
-				if frame and not frameControlledByStroke then
-					frame.Visible = false
-				end
-
-				local root = player.Character:FindFirstChild("HumanoidRootPart")
-				if root then
-					root.CFrame = CFrame.new(
-						root.Position,
-						Vector3.new(
-							camera.CFrame.LookVector.X * MaxLength,
-							root.Position.Y,
-							camera.CFrame.LookVector.Z * MaxLength
-						)
+			if root then
+				root.CFrame = CFrame.new(
+					root.Position,
+					Vector3.new(
+						camera.CFrame.LookVector.X * MaxLength,
+						root.Position.Y,
+						camera.CFrame.LookVector.Z * MaxLength
 					)
-				end
+				)
 				camera.CFrame = camera.CFrame * EnabledOffset
 				camera.Focus = CFrame.fromMatrix(
 					camera.Focus.Position,
@@ -147,9 +157,19 @@ local function toggleShiftLock()
 			end
 		end)
 	else
-		if player.Character and player.Character:FindFirstChild("Humanoid") then
-			player.Character.Humanoid.AutoRotate = true
+		-- ⭐ [OPTIMIZACIÓN] Desconectar el bucle PRIMERO
+		pcall(function()
+			Active:Disconnect()
+			Active = nil
+		end)
+		
+		-- ⭐ [OPTIMIZACIÓN] Aplicar cambios de estado DESPUÉS de desconectar
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.AutoRotate = true
 		end
+		
 		ShiftLockButton.Image = States.Off
 		camera.CFrame = camera.CFrame * DisabledOffset
 		ShiftlockCursor.Visible = false
@@ -164,11 +184,6 @@ local function toggleShiftLock()
 				end
 			end
 		end
-
-		pcall(function()
-			Active:Disconnect()
-			Active = nil
-		end)
 	end
 end
 
