@@ -24,6 +24,33 @@ Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 	Camera = Workspace.CurrentCamera
 end)
 
+local _cameraFollowConn = nil
+local _cameraFollowTarget = nil
+
+local function _cameraFollowUpdate()
+	if not _cameraFollowTarget or not _cameraFollowTarget.Parent then return end
+	local cam = Workspace and Workspace.CurrentCamera
+	if not cam then return end
+	local camPos = cam.CFrame.Position
+	local lookCFrame = CFrame.lookAt(camPos, _cameraFollowTarget.Position, Vector3.new(0,1,0))
+	cam.CFrame = cam.CFrame:Lerp(lookCFrame, 0.35)
+end
+
+local function startCameraFollow(part)
+	if not part or not part:IsA("BasePart") then return end
+	_cameraFollowTarget = part
+	if _cameraFollowConn then return end
+	_cameraFollowConn = RunService:BindToRenderStep("AimbotCameraFollow", Enum.RenderPriority.Camera.Value + 1, _cameraFollowUpdate)
+end
+
+local function stopCameraFollow()
+	if _cameraFollowConn then
+		RunService:UnbindFromRenderStep("AimbotCameraFollow")
+		_cameraFollowConn = nil
+	end
+	_cameraFollowTarget = nil
+end
+
 local function hasLibraryBook(character)
 	if not character then return false end
 	for _, obj in ipairs(character:GetChildren()) do
@@ -74,16 +101,6 @@ local function getTargetPartByPriority(model, priorityList)
 		end
 	end
 	return nil
-end
-
-local function lockCameraToTargetPart(targetPart)
-	if not targetPart or not Workspace.CurrentCamera then return end
-	local cam = Workspace.CurrentCamera
-	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-	local camPos = cam.CFrame.Position
-	local targetPos = targetPart.Position
-	cam.CFrame = CFrame.lookAt(camPos, targetPos, root.CFrame.UpVector)
 end
 
 local function isTimerVisible()
@@ -151,17 +168,14 @@ end
 local function bindCircleDetection(char)
 	clearCharConnections()
 	circleActive = checkCircleConditions(char)
-
 	local attrConn = char:GetAttributeChangedSignal("TeacherName"):Connect(function()
 		circleActive = checkCircleConditions(char)
 	end)
 	table.insert(charConnections, attrConn)
-
 	local parentConn = char:GetPropertyChangedSignal("Parent"):Connect(function()
 		circleActive = checkCircleConditions(char)
 	end)
 	table.insert(charConnections, parentConn)
-
 	local humanoid = char:FindFirstChild("Humanoid")
 	if humanoid then
 		local addConn = humanoid.ChildAdded:Connect(function(child)
@@ -198,7 +212,6 @@ local function getCircleTargets()
 	if not char then return models end
 	if not circleActive then return models end
 	if isTimerVisible() then return models end
-
 	for _, m in ipairs(getModelsFromFolders({"Students", "Alices"})) do
 		if m ~= char and (m:FindFirstChild("Head") or m:FindFirstChild("UpperTorso") or m:FindFirstChild("Torso")) then
 			table.insert(models, m)
@@ -225,18 +238,15 @@ end
 local function chooseTarget(models, parts)
 	if not Camera then Camera = Workspace.CurrentCamera end
 	if not Camera or #models == 0 then return nil end
-
 	local camPos = Camera.CFrame.Position
 	local camLook = Camera.CFrame.LookVector
 	local best = nil
 	local bestDist = math.huge
-
 	if LocalPlayer.Character then
 		rayParams.FilterDescendantsInstances = { LocalPlayer.Character }
 	else
 		rayParams.FilterDescendantsInstances = {}
 	end
-
 	for _, model in ipairs(models) do
 		local part = getTargetPartByPriority(model, parts)
 		if part and part.Position then
@@ -255,93 +265,98 @@ local function chooseTarget(models, parts)
 			end
 		end
 	end
-
 	return best
 end
 
 local isAimbotRunning = false
-local AIMBOT_RENDER_NAME = "CustomAimbotLoop"
+local aimbotThread = nil -- Usaremos esto para controlar el bucle
 local activationConns = {}
 
 local function isEligible()
 	local char = LocalPlayer and LocalPlayer.Character
 	if not char then return false end
-
 	local teacher = char:GetAttribute("TeacherName")
 	local hasBook = hasLibraryBook(char)
 	local humanoid = char:FindFirstChild("Humanoid")
 	local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
-	
 	local isLibrary = (char.Parent and char.Parent.Name == "Students" and hasBook)
 	local isThavel = (teacher == "Thavel" and char:GetAttribute("Charging") == true)
 	local isCircle = (teacher == "Circle" and sprintLock and not isTimerVisible())
 	local isBloomie = (teacher == "Bloomie" and char:GetAttribute("Aiming") == true)
-	
 	if (isLibrary or isThavel or isCircle or isBloomie) then
 		return true
 	end
 	return false
 end
 
-local function aimbotUpdateFunction()
-	if not isEligible() then
-		RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
-		isAimbotRunning = false
-		return
-	end
+local function aimbotTargetingLoop()
+	while isAimbotRunning do
+		-- Solo busca un nuevo objetivo cada 0.1 segundos (10 veces por segundo)
+        -- Puedes ajustar este valor si 0.1 es muy lento o muy rápido
+		task.wait(0.1) 
 
-	local char = LocalPlayer and LocalPlayer.Character
-	if not char then return end
+		if not isAimbotRunning then break end -- Salida rápida si se llamó a stopAimbot
 
-	local attrTeacher = char:GetAttribute("TeacherName")
-	local hasBook = hasLibraryBook(char)
-	local humanoid = char:FindFirstChild("Humanoid")
-	local sprintLock = humanoid and humanoid:FindFirstChild("SprintLock")
-	if not (hasBook or (attrTeacher == "Thavel" and char:GetAttribute("Charging")) or (attrTeacher == "Circle" and sprintLock) or (attrTeacher == "Bloomie" and char:GetAttribute("Aiming"))) then
-		return
-	end
-
-	local lib = getLibraryBookTargets()
-	local thavel = getThavelTargets()
-	local circle = getCircleTargets()
-	local bloomie = getBloomieTargets()
-
-	local currentTarget, currentMode = nil, nil
-
-	if #lib > 0 then
-		currentTarget = chooseTarget(lib, AIM_PARTS.LibraryBook)
-		currentMode = "LibraryBook"
-	elseif #thavel > 0 then
-		currentTarget = chooseTarget(thavel, AIM_PARTS.Thavel)
-		currentMode = "Thavel"
-	elseif #circle > 0 then
-		currentTarget = chooseTarget(circle, AIM_PARTS.Circle)
-		currentMode = "Circle"
-	elseif #bloomie > 0 then
-		currentTarget = chooseTarget(bloomie, AIM_PARTS.Bloomie)
-		currentMode = "Bloomie"
-	end
-
-	if currentTarget and currentMode then
-		local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
-		if part then
-			lockCameraToTargetPart(part)
+		if not isEligible() then
+			-- Si ya no somos elegibles, detenemos el seguimiento y salimos del bucle
+			pcall(stopCameraFollow)
+			isAimbotRunning = false -- Esto detendrá el bucle 'while'
+			break -- Salir del bucle
 		end
+		
+		local char = LocalPlayer and LocalPlayer.Character
+		if not char then 
+			pcall(stopCameraFollow)
+			isAimbotRunning = false
+			break
+		end
+
+        -- El resto de tu lógica de búsqueda de objetivos va aquí
+        local lib = getLibraryBookTargets()
+        local thavel = getThavelTargets()
+        local circle = getCircleTargets()
+        local bloomie = getBloomieTargets()
+        local currentTarget, currentMode = nil, nil
+        if #lib > 0 then
+            currentTarget = chooseTarget(lib, AIM_PARTS.LibraryBook)
+            currentMode = "LibraryBook"
+        elseif #thavel > 0 then
+            currentTarget = chooseTarget(thavel, AIM_PARTS.Thavel)
+            currentMode = "Thavel"
+        elseif #circle > 0 then
+            currentTarget = chooseTarget(circle, AIM_PARTS.Circle)
+            currentMode = "Circle"
+        elseif #bloomie > 0 then
+            currentTarget = chooseTarget(bloomie, AIM_PARTS.Bloomie)
+            currentMode = "Bloomie"
+        end
+        
+        if currentTarget and currentMode then
+            local part = getTargetPartByPriority(currentTarget, AIM_PARTS[currentMode])
+            if part then
+                startCameraFollow(part) -- Esto activa el seguimiento en RenderStep (correcto)
+            else
+                stopCameraFollow() -- Esto detiene el seguimiento en RenderStep
+            end
+        else
+            stopCameraFollow()
+        end
 	end
+    
+    aimbotThread = nil -- Limpiar la referencia al hilo cuando el bucle termina
 end
 
 local function runAimbot()
 	if isAimbotRunning then return end
 	isAimbotRunning = true
-	
-	local camPriority = Enum.RenderPriority.Last.Value
-	RunService:BindToRenderStep(AIMBOT_RENDER_NAME, camPriority, aimbotUpdateFunction)
+    -- Inicia la búsqueda de objetivos en un hilo separado (coroutine)
+	aimbotThread = task.spawn(aimbotTargetingLoop) 
 end
 
 local function stopAimbot()
 	if not isAimbotRunning then return end
-	RunService:UnbindFromRenderStep(AIMBOT_RENDER_NAME)
-	isAimbotRunning = false
+	isAimbotRunning = false -- Esto le dirá al bucle 'while' que se detenga
+	pcall(stopCameraFollow) -- Detiene el seguimiento de la cámara inmediatamente
 end
 
 local function clearActivationConns()
@@ -355,29 +370,23 @@ end
 
 local function bindAutoActivation()
 	clearActivationConns()
-
 	local function checkAndRun()
 		if not isAimbotRunning and isEligible() then
 			runAimbot()
 		end
 	end
-
 	local char = LocalPlayer and LocalPlayer.Character
 	if not char then return end
-
 	table.insert(activationConns, char:GetAttributeChangedSignal("TeacherName"):Connect(checkAndRun))
 	table.insert(activationConns, char:GetAttributeChangedSignal("Charging"):Connect(checkAndRun))
 	table.insert(activationConns, char:GetAttributeChangedSignal("Aiming"):Connect(checkAndRun))
-
 	table.insert(activationConns, char.ChildAdded:Connect(checkAndRun))
 	table.insert(activationConns, char.ChildRemoved:Connect(checkAndRun))
-
 	local humanoid = char:FindFirstChild("Humanoid")
 	if humanoid then
 		table.insert(activationConns, humanoid.ChildAdded:Connect(checkAndRun))
 		table.insert(activationConns, humanoid.ChildRemoved:Connect(checkAndRun))
 	end
-
 	local pg = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
 	if pg then
 		local timer = pg:FindFirstChild("GameUI.Mobile.Alt.Timer", true)
@@ -385,7 +394,6 @@ local function bindAutoActivation()
 			table.insert(activationConns, timer:GetPropertyChangedSignal("Visible"):Connect(checkAndRun))
 		end
 	end
-
 	checkAndRun()
 end
 
@@ -404,4 +412,5 @@ LocalPlayer.CharacterRemoving:Connect(function()
 	clearActivationConns()
 	clearCharConnections()
 	circleActive = false
+	pcall(stopCameraFollow)
 end)
