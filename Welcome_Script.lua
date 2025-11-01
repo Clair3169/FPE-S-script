@@ -8,9 +8,9 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local dialogues = {
 	"Welcome.",
-	"HAPPY HALLOWEEN!!",
+	"Fpe R.I.P 💔",
 	"This script works more for mobile than for PC",
-	"Did you read that this is in beta?",
+	"Did you read that this is in alpha?",
 	"Hi how are things? everything okay Bro?",
 	"Hi",
 	"this programming thing is veeeery difficult..."
