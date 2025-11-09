@@ -53,7 +53,7 @@ updatePlayerCount()
 -- ============================================================
 
 local dialogueConfig = {
-	{text = "Script in Tester", color = Color3.fromRGB(255, 255, 0)},
+	{text = "Script in Tester", color = Color3.fromRGB(255, 0, 0)},
 	{text = "", color = Color3.fromRGB(0, 255, 255)},
 	-- {text = "Otro más", color = Color3.fromRGB(255, 0, 255)},
 }
