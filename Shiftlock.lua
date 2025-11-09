@@ -1,5 +1,4 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
@@ -29,8 +28,10 @@ local States = {
 }
 
 local MaxLength = 900000
-local EnabledOffset = CFrame.new(1.7, 0, 0)
-local DisabledOffset = CFrame.new(-1.7, 0, 0)
+-- [[ CAMBIO AQUÍ ]]
+-- Ahora usamos Vector3 para el CameraOffset
+local EnabledOffset = Vector3.new(1.7, 0, 0)
+local DisabledOffset = Vector3.new(0, 0, 0)
 local Active
 
 ShiftLockScreenGui.Name = "Shiftlock (CoreGui)"
@@ -67,101 +68,58 @@ camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
 	centerY = viewport.Y / 2
 end)
 
-local debrisFolder = Workspace:FindFirstChild("Debris")
-local fakeCursor = debrisFolder and debrisFolder:FindFirstChild("FakeCursor")
-local fakeCursorAttachment = fakeCursor and fakeCursor:FindFirstChild("Attachment")
-local fakeCursorGui = fakeCursorAttachment and fakeCursorAttachment:FindFirstChild("BillboardGui")
-local frame = fakeCursorGui and fakeCursorGui:FindFirstChild("Frame")
-local uiScale = frame and frame:FindFirstChildOfClass("UIScale")
-local uiStroke = frame and frame:FindFirstChildOfClass("UIStroke")
-
-local frameControlledByStroke = false
-local TOLERANCE = 0.01
-
-if uiStroke then
-	uiStroke:GetPropertyChangedSignal("Thickness"):Connect(function()
-		if not frame then return end
-
-		if math.abs(uiStroke.Thickness - 1.5) <= TOLERANCE then
-			if not frameControlledByStroke then
-				frameControlledByStroke = true
-				frame.Visible = true
-			end
-		else
-			if frameControlledByStroke then
-				frameControlledByStroke = false
-				frame.Visible = false
-			end
-		end
-	end)
-
-	if frame and math.abs(uiStroke.Thickness - 1.5) <= TOLERANCE then
-		frameControlledByStroke = true
-		frame.Visible = true
-	end
-end
+-- [[ SE ELIMINARON LAS REFERENCIAS A DEBRIS, FRAME y UISTROKE DE AQUÍ ]] --
 
 local function toggleShiftLock()
 	if not Active then
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		
-		if not humanoid then return end
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not humanoid or not root then return end
 
 		humanoid.AutoRotate = false
+		humanoid.CameraOffset = EnabledOffset -- [[ CAMBIO CLAVE ]]
+		
 		ShiftLockButton.Image = States.On
 		ShiftlockCursor.Visible = false
 
-		if frame and not frameControlledByStroke then
-			frame.Visible = false
+		-- [[ SE ELIMINÓ LA LÓGICA DEL FRAME AQUÍ ]]
+		
+		-- Ya no manipulamos camera.CFrame ni camera.Focus
+
+		local function updateOrientation()
+			if not root then return end
+			root.CFrame = CFrame.new(
+				root.Position,
+				Vector3.new(
+					camera.CFrame.LookVector.X * MaxLength,
+					root.Position.Y,
+					camera.CFrame.LookVector.Z * MaxLength
+				)
+			)
 		end
 
-		Active = RunService.RenderStepped:Connect(function()
-			local currentCharacter = player.Character
-			local root = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+		Active = camera:GetPropertyChangedSignal("CFrame"):Connect(updateOrientation)
+		updateOrientation()
 
-			if root then
-				root.CFrame = CFrame.new(
-					root.Position,
-					Vector3.new(
-						camera.CFrame.LookVector.X * MaxLength,
-						root.Position.Y,
-						camera.CFrame.LookVector.Z * MaxLength
-					)
-				)
-				camera.CFrame = camera.CFrame * EnabledOffset
-				camera.Focus = CFrame.fromMatrix(
-					camera.Focus.Position,
-					camera.CFrame.RightVector,
-					camera.CFrame.UpVector
-				) * EnabledOffset
-			end
-		end)
 	else
 		pcall(function()
 			Active:Disconnect()
 			Active = nil
 		end)
-		
+
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			humanoid.AutoRotate = true
+			humanoid.CameraOffset = DisabledOffset -- [[ CAMBIO CLAVE ]]
 		end
-		
+
 		ShiftLockButton.Image = States.Off
-		camera.CFrame = camera.CFrame * DisabledOffset
+		-- Ya no manipulamos camera.CFrame
 		ShiftlockCursor.Visible = false
 
-		if frame then
-			if not frameControlledByStroke then
-				if uiStroke and uiStroke.Thickness ~= 1.5 then
-					frame.Visible = true
-				else
-					frame.Visible = false
-				end
-			end
-		end
+		-- [[ SE ELIMINÓ LA LÓGICA DEL FRAME AQUÍ ]]
 	end
 end
 
@@ -175,7 +133,13 @@ if isPC then
 		end
 	end
 
-	ContextActionService:BindAction("CustomShiftLockToggle", handleKeyInput, false, Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl)
+	ContextActionService:BindAction(
+		"CustomShiftLockToggle",
+		handleKeyInput,
+		false,
+		Enum.KeyCode.LeftControl,
+		Enum.KeyCode.RightControl
+	)
 else
 	ShiftLockButton.MouseButton1Click:Connect(toggleShiftLock)
 end
