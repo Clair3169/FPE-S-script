@@ -1,5 +1,3 @@
--- LocalScript (puedes ejecutar en la Command Bar o como GUI script)
-
 local SoundService = game:GetService("SoundService")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players:GetPlayers()[1]
@@ -21,7 +19,7 @@ label.BackgroundTransparency = 1
 label.TextColor3 = Color3.fromRGB(255, 255, 255)
 label.TextScaled = true
 label.Font = Enum.Font.GothamBold
-label.Text = "--:--"
+label.Text = "-:--"
 label.Visible = true
 label.Parent = screenGui
 
@@ -34,11 +32,23 @@ local quietHalls = base:WaitForChild("QuietHalls")
 local properBehavior = base:WaitForChild("ProperBehavior")
 local studentSound = phase2:WaitForChild("Student")
 
--- Función de formato MM:SS
+-- [[ ¡AQUÍ ESTÁ LA SOLUCIÓN! ]]
+-- En esta tabla, defines cuántos segundos quieres "recortar" del final de cada música.
+-- ¡Puedes cambiar estos valores como quieras!
+-- para retar minutos es escribir un calculo (2 * 60) + 13, 2 min con 13 segundos
+-- (-- * 60) + --
+local soundOffsets = {
+	[quietHalls] = 0,     -- Ejemplo: Resta 3.5 segundos al total de quietHalls
+	[properBehavior] = 5,  -- Ejemplo: Resta 2 segundos al total de properBehavior
+	[studentSound] = 15    -- Ejemplo: No resta nada a studentSound (puedes poner el valor que quieras)
+}
+
+-- Función de formato M:SS (MODIFICADA)
 local function formatTime(seconds)
 	local minutes = math.floor(seconds / 60)
 	local secs = math.floor(seconds % 60)
-	return string.format("%02d:%02d", minutes, secs)
+	-- Se cambió %02d por %d para los minutos
+	return string.format("%d:%02d", minutes, secs) 
 end
 
 -- Esperar hasta que los sonidos tengan duración
@@ -67,12 +77,24 @@ task.spawn(function()
 		end
 
 		if activeSound then
-			local remaining = math.max(activeSound.TimeLength - activeSound.TimePosition, 0)
+			-- [[ MODIFICACIÓN DEL CÁLCULO ]]
+			
+			-- 1. Obtenemos el descuento de tiempo para la canción actual (0 si no está en la tabla)
+			local offset = soundOffsets[activeSound] or 0
+			
+			-- 2. Calculamos la duración "efectiva" restando ese descuento
+			local effectiveTimeLength = activeSound.TimeLength - offset
+			
+			-- 3. Calculamos el tiempo restante usando la nueva duración efectiva
+			local remaining = math.max(effectiveTimeLength - activeSound.TimePosition, 0)
+			
+			-- [[ FIN DE LA MODIFICACIÓN ]]
+
 			label.Text = formatTime(remaining)
 
 			-- Cambiar color cuando queden <= 25s
-			if remaining <= 25 then
-				label.TextColor3 = Color3.fromRGB(139, 0, 0)
+			if remaining <= 26 then
+				label.TextColor3 = Color3.fromRGB(255, 0, 0)
 			else
 				label.TextColor3 = Color3.fromRGB(255, 255, 255)
 			end
