@@ -1,120 +1,73 @@
-local global_env = (type(getgenv) == "function" and getgenv()) or _G
+--// LoadOnceManager.lua
+-- Coloca este script en StarterPlayerScripts o similar.
 
-if global_env.FPE_Loader then
-    return
+-- CONFIGURACIÓN
+local urls = {
+	 "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/AimBot.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Blackout.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Delete_Areas.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Dialogues.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/JumpPower_Perma.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Key_notification.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/SprintFake.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Stamina_INF.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Stundents_Esp.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Teachers_Esp.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/TextLabel.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Time.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Visual_Enraged.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Welcome_Script.lua",
+}
+
+-- NOMBRE DE LA MARCA PARA RECORDAR QUE YA SE EJECUTÓ
+local flagName = "HasLoadedScriptsOnce"
+
+-- SERVICIOS
+local player = game.Players.LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Función para marcar que ya se ejecutó
+local function setExecutedFlag()
+	local flag = Instance.new("BoolValue")
+	flag.Name = flagName
+	flag.Value = true
+	flag.Parent = replicatedStorage
 end
 
-local Loader = {}
-Loader.__index = Loader
-
-local function new_loader()
-    local self = setmetatable({}, Loader)
-
-    self.scripts = {
-        {name = "Script FPE", url = "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Principal_Loader.lua"}
-    }
-
-    self.loaded_urls = global_env.FPE_loaded_urls or {}
-    global_env.FPE_loaded_urls = self.loaded_urls
-    
-    self.loading_urls = {}
-
-    self.FLAG_NAME = "FPE_SCRIPTS_LOADED_ONCE"
-    self.loaded_flag_set = global_env[self.FLAG_NAME] == true
-
-    global_env[self.FLAG_NAME] = true
-
-    self.loaded = false
-    return self
+-- Función para verificar si ya se ejecutó
+local function hasExecuted()
+	return replicatedStorage:FindFirstChild(flagName) ~= nil
 end
 
-function Loader:is_url_loaded(url)
-    for _, u in ipairs(self.loaded_urls) do
-        if u == url then return true end
-    end
-    return false
+-- Función para cargar scripts desde URL (solo si no se ha ejecutado antes)
+local function loadOnce()
+	if hasExecuted() then
+		warn("⚠️ El script ya esta cargado.")
+		return
+	end
+
+	for _, url in ipairs(urls) do
+		task.spawn(function()
+			local success, response = pcall(function()
+				return game:HttpGet(url)
+			end)
+			if success and response then
+				local runSuccess, err = pcall(function()
+					loadstring(response)()
+				end)
+				if not runSuccess then
+					warn("❌ Error ejecutando script desde URL:", url, "\n", err)
+				else
+					-- print("✅ Script cargado exitosamente")
+				end
+			else
+				warn("⚠️ No se pudo obtener el script desde:", url)
+			end
+		end)
+	end
+
+	setExecutedFlag()
 end
 
-function Loader:load_url_entry(entry)
-    local name, url = entry.name or ("URL: "..tostring(entry.url)), entry.url
-    if not url or url == "" then
-        return false
-    end
-    
-    if self:is_url_loaded(url) then
-        return true
-    end
-
-    if self.loading_urls[url] then
-        return true
-    end
-
-    self.loading_urls[url] = true
-
-    local ok, err = pcall(function()
-        local res = game:HttpGet(url, true)
-        local func = loadstring(res)
-        if type(func) ~= "function" then
-            error("loadstring no devolvió función para "..tostring(url))
-        end
-        func()
-    end)
-
-    if ok then
-        table.insert(self.loaded_urls, url)
-        print(("FPE Loader: '%s' cargado correctamente."):format(name))
-    end
-    
-    self.loading_urls[url] = nil
-
-    return ok
-end
-
-function Loader:load_all()
-    for _, entry in ipairs(self.scripts) do
-        task.spawn(self.load_url_entry, self, entry)
-    end
-    self.loaded = true
-end
-
-function Loader:add(url, name, autoload)
-    if type(url) ~= "string" or url == "" then
-        error("FPE Loader: url inválida en add(url, name, autoload)")
-    end
-    local entry = {name = name or url, url = url}
-
-    for _, e in ipairs(self.scripts) do
-        if e.url == url then
-            if autoload then
-                task.spawn(self.load_url_entry, self, e)
-            end
-            return
-        end
-    end
-
-    table.insert(self.scripts, entry)
-
-    if autoload or self.loaded then
-        task.spawn(self.load_url_entry, self, entry)
-    end
-end
-
-function Loader:add_many(t, autoload)
-    if type(t) ~= "table" then return end
-    if #t > 0 and type(t[1]) == "string" then
-        for _, url in ipairs(t) do
-            self:add(url, nil, autoload)
-        end
-    else
-        for _, obj in ipairs(t) do
-            if type(obj) == "table" then
-                self:add(obj.url or obj[1], obj.name or obj[2], autoload)
-            end
-        end
-    end
-end
-
-local instance = new_loader()
-global_env.FPE_Loader = instance
-
-instance:load_all()
+-- Ejecutar una vez
+loadOnce()
