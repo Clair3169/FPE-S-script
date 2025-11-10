@@ -6,8 +6,8 @@ local StarterGui = game:GetService("StarterGui")
 local bindableFunction = Instance.new("BindableFunction")
 bindableFunction.OnInvoke = function(buttonClicked)
 	if buttonClicked == "Yes" then
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script-Test/refs/heads/main/Cframe_Walkspeed.lua", true))()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script-Test/refs/heads/main/Notification_Warning.lua", true))()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Walkspeed.lua", true))()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Notification_Warning.lua", true))()
 	elseif buttonClicked == "No" then
 		-- no se hace nada
 	end
