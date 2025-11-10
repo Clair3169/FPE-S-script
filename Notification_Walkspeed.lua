@@ -21,4 +21,4 @@ StarterGui:SetCore("SendNotification", {
 	Callback = bindableFunction,
 	Button1 = "Yes",
 	Button2 = "No"
-})￼Enter
+})
