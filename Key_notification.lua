@@ -18,6 +18,7 @@ bindableFunction.OnInvoke = function(buttonClicked)
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Shiftlock.lua", true))()
 		-- Cframe Walkspeed 
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Notification_Walkspeed.lua", true))()
+		
 	elseif buttonClicked == "Nha" then
 		hasThirdPerson.Value = false
 	end
