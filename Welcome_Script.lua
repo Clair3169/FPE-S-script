@@ -13,7 +13,12 @@ local dialogues = {
 	"Did you read that this is in alpha?",
 	"Hi how are things? everything okay Bro?",
 	"Hi",
-	"this programming thing is veeeery difficult..."
+	"this programming thing is veeeery difficult...",
+	"Use this script at your own risk",
+	"Don't be so obvious when using the script",
+	"The speed function is very forward.",
+	"Use features that are very revealing with an alternative account",
+	"This script is updated more than the game itself 🥀"
 }
 
 -- GUI principal
