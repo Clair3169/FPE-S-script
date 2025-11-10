@@ -52,5 +52,3 @@ player.CharacterAdded:Connect(setupCharacter)
 if player.Character then
 	setupCharacter(player.Character)
 end
-
-print("[Fake WalkSpeed CFrame] activo – cámara sin modificar, velocidad visual:", FakeSpeed)￼Enter
