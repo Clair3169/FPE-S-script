@@ -1,28 +1,26 @@
--- 🟢 Student Highlighter, Teachers System (Cache persistente + Optimizado + Sin dependencias de cabeza)
+-- 🟢 Student Highlighter Optimizado (solo eventos, sin Heartbeat)
 repeat task.wait() until game:IsLoaded()
 
 -- ⚙️ Servicios
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 
 -- 👤 Jugador local
 local localPlayer = Players.LocalPlayer
 
--- 📂 Carpetas principales
+-- 📂 Carpetas
 local studentsFolder = Workspace:WaitForChild("Students")
-local VALID_FOLDERS = { "Alices", "Teachers" } -- Solo en estas se activará el sistema
+local VALID_FOLDERS = { "Alices", "Teachers" }
 
 -- ⚙️ Configuración
 local MAX_VISIBLE = 10
 local MAX_DISTANCE = 200
 local UPDATE_THRESHOLD = 5
-local systemActive = false
 
--- 🧠 Estado de caché
-local activeHighlights = {} -- { [character] = Highlight }
+-- 🧠 Estado
+local systemActive = false
+local activeHighlights = {}
 local visibleStudents = {}
-local currentCamera = Workspace.CurrentCamera
 
 -- 🔧 Carpeta cache persistente
 local highlightCache = Workspace:FindFirstChild("HighlightCache_Students") or Instance.new("Folder")
@@ -30,14 +28,13 @@ highlightCache.Name = "HighlightCache_Students"
 highlightCache.Parent = Workspace
 
 ------------------------------------------------------------
--- 🧩 Fallback seguro para obtener posición del modelo
+-- 🧩 Obtener posición del modelo
 ------------------------------------------------------------
 local function getModelPosition(model)
 	if not model or not model:IsA("Model") then return nil end
 	if model.PrimaryPart then
 		return model.PrimaryPart.Position
 	end
-	-- fallback: tomar la primera parte válida
 	for _, part in ipairs(model:GetChildren()) do
 		if part:IsA("BasePart") then
 			return part.Position
@@ -47,7 +44,7 @@ local function getModelPosition(model)
 end
 
 ------------------------------------------------------------
--- 🧩 Función: Crear o recuperar Highlight de cache
+-- 🧩 Crear o recuperar Highlight de cache
 ------------------------------------------------------------
 local function getOrCreateHighlight(character)
 	if not character or not character:IsA("Model") then return end
@@ -58,7 +55,6 @@ local function getOrCreateHighlight(character)
 
 	local cacheName = character.Name .. "_HL_Student"
 	local cached = highlightCache:FindFirstChild(cacheName)
-
 	if cached and cached:IsA("Highlight") then
 		cached.Adornee = character
 		cached.Enabled = false
@@ -69,7 +65,7 @@ local function getOrCreateHighlight(character)
 	local highlight = Instance.new("Highlight")
 	highlight.Name = cacheName
 	highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
-	highlight.FillTransparency = 0.85 -- un poco visible
+	highlight.FillTransparency = 0.85
 	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
 	highlight.Adornee = character
@@ -80,18 +76,7 @@ local function getOrCreateHighlight(character)
 end
 
 ------------------------------------------------------------
--- 🧩 Pre-generar cache de todos los Students al inicio
-------------------------------------------------------------
-task.defer(function()
-	for _, student in ipairs(studentsFolder:GetChildren()) do
-		if student:IsA("Model") and student ~= localPlayer.Character then
-			getOrCreateHighlight(student)
-		end
-	end
-end)
-
-------------------------------------------------------------
--- 🧩 Activar/Desactivar Highlight
+-- 🧩 Cambiar estado del Highlight
 ------------------------------------------------------------
 local function updateHighlightState(character, state)
 	local highlight = getOrCreateHighlight(character)
@@ -101,7 +86,7 @@ local function updateHighlightState(character, state)
 end
 
 ------------------------------------------------------------
--- 🧩 Actualizar lista de visibles por distancia
+-- 🧩 Actualizar lista visible
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
@@ -149,7 +134,7 @@ local function updateVisibleStudents()
 end
 
 ------------------------------------------------------------
--- 🧩 Estado del sistema (solo si está en Alices o Teachers)
+-- 🧩 Verificar si el jugador puede usar el sistema
 ------------------------------------------------------------
 local function isInValidFolder()
 	local char = localPlayer.Character
@@ -178,7 +163,7 @@ local function updateSystemStatus(force)
 end
 
 ------------------------------------------------------------
--- 🧠 Monitor de Students
+-- 🧩 Monitor de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if child:IsA("Model") and child ~= localPlayer.Character then
@@ -190,14 +175,13 @@ studentsFolder.ChildAdded:Connect(function(child)
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
-	if activeHighlights[child] then
-		local hl = activeHighlights[child]
-		if hl then
-			hl.Enabled = false
-			hl.Adornee = nil
-		end
-		activeHighlights[child] = nil
+	local hl = activeHighlights[child]
+	if hl then
+		hl.Enabled = false
+		hl.Adornee = nil
+		hl:Destroy()
 	end
+	activeHighlights[child] = nil
 	visibleStudents[child] = nil
 end)
 
@@ -206,6 +190,23 @@ end)
 ------------------------------------------------------------
 local function onCharacterAdded(character)
 	updateSystemStatus(true)
+
+	-- Escucha el cambio de posición (en vez de usar Heartbeat)
+	task.defer(function()
+		local root = character:WaitForChild("HumanoidRootPart", 3)
+		if not root then return end
+
+		local lastPos = root.Position
+		root:GetPropertyChangedSignal("Position"):Connect(function()
+			if not systemActive then return end
+			local newPos = root.Position
+			if (newPos - lastPos).Magnitude > UPDATE_THRESHOLD then
+				lastPos = newPos
+				updateVisibleStudents()
+			end
+		end)
+	end)
+
 	character:GetPropertyChangedSignal("Parent"):Connect(updateSystemStatus)
 end
 
@@ -215,33 +216,17 @@ end
 localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
 ------------------------------------------------------------
--- ♻️ OPTIMIZACIÓN: actualización por movimiento
+-- ♻️ Limpieza automática por evento
 ------------------------------------------------------------
-task.spawn(function()
-	local lastPos = Vector3.zero
-	while RunService.Heartbeat:Wait() do
-		if not systemActive or not localPlayer.Character then continue end
-		local pos = getModelPosition(localPlayer.Character)
-		if not pos then continue end
-
-		if (pos - lastPos).Magnitude > UPDATE_THRESHOLD then
-			lastPos = pos
-			updateVisibleStudents()
+Workspace.DescendantRemoving:Connect(function(obj)
+	if activeHighlights[obj] then
+		local hl = activeHighlights[obj]
+		if hl then
+			hl.Enabled = false
+			hl.Adornee = nil
+			hl:Destroy()
 		end
-	end
-end)
-
-------------------------------------------------------------
--- ♻️ Limpieza lógica (sin eliminar cache)
-------------------------------------------------------------
-RunService.Stepped:Connect(function()
-	for char, highlight in pairs(activeHighlights) do
-		if not char or not char.Parent then
-			if highlight then
-				highlight.Enabled = false
-				highlight.Adornee = nil
-			end
-			activeHighlights[char] = nil
-		end
+		activeHighlights[obj] = nil
+		visibleStudents[obj] = nil
 	end
 end)
