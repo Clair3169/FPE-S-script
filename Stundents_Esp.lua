@@ -174,12 +174,18 @@ studentsFolder.ChildAdded:Connect(function(child)
 	end
 end)
 
+task.defer(function()
+	local hl = getOrCreateHighlight(child)
+	if systemActive then
+		updateVisibleStudents()
+	end
+end)
+
 studentsFolder.ChildRemoved:Connect(function(child)
 	local hl = activeHighlights[child]
 	if hl then
-		hl.Enabled = false
-		hl.Adornee = nil
-		hl:Destroy()
+	hl.Enabled = false
+    hl.Adornee = nil		
 	end
 	activeHighlights[child] = nil
 	visibleStudents[child] = nil
@@ -214,6 +220,14 @@ if localPlayer.Character then
 	onCharacterAdded(localPlayer.Character)
 end
 localPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+localPlayer.CharacterRemoving:Connect(function()
+	systemActive = false
+	for _, hl in pairs(activeHighlights) do
+		if hl then hl.Enabled = false end
+	end
+end)
+
 
 ------------------------------------------------------------
 -- ♻️ Limpieza automática por evento
