@@ -1,14 +1,12 @@
--- 🧠 Local Script Ultra Optimizado (Roles: Teachers/Alices/Students)
+-- 🧠 Local Script optimizado solo con eventos (sin Heartbeat)
 repeat task.wait() until game:IsLoaded()
 
 --// Servicios
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 
 --// Variables principales
 local LocalPlayer = Players.LocalPlayer
-local PlayerModel = nil
 
 local Folders = {
 	Alices = Workspace:WaitForChild("Alices"),
@@ -17,25 +15,29 @@ local Folders = {
 }
 
 --// Configuración
-local MAX_RENDER_DISTANCE = 300
-local CHECK_INTERVAL = 5
+local MAX_RENDER_DISTANCE = 250
 
---// Colores por carpeta
+--// Colores
 local COLORS = {
-	Teachers = Color3.fromRGB(255, 0, 0), -- rojo brillante
-	Alices = Color3.fromRGB(150, 0, 0),   -- rojo oscuro
+	Teachers = Color3.fromRGB(255, 0, 0),
+	Alices = Color3.fromRGB(150, 0, 0),
 }
 
--- 🗂️ Carpeta cache persistente para todos los highlights
+--// Cache
 local HighlightCache = Workspace:FindFirstChild("HighlightCache_Main") or Instance.new("Folder")
 HighlightCache.Name = "HighlightCache_Main"
 HighlightCache.Parent = Workspace
 
+local ActiveHighlights = {}
+local HeadCache = {}
+
 ------------------------------------------------------------
--- 🧩 Función: Obtener cabeza real del modelo
+-- 🧩 Obtener cabeza real
 ------------------------------------------------------------
 local function getRealHead(model)
 	if not model or not model:IsA("Model") then return nil end
+	if HeadCache[model] then return HeadCache[model] end
+
 	local teacherName = model:GetAttribute("TeacherName")
 	local head = model:FindFirstChild("Head")
 	if not head then return nil end
@@ -43,18 +45,20 @@ local function getRealHead(model)
 	if teacherName == "AlicePhase2" and head:IsA("Model") then
 		local inner = head:FindFirstChild("Head")
 		if inner and inner:IsA("BasePart") then
+			HeadCache[model] = inner
 			return inner
 		end
 	end
 
 	if head:IsA("BasePart") then
+		HeadCache[model] = head
 		return head
 	end
 	return nil
 end
 
 ------------------------------------------------------------
--- 🧩 Detectar carpeta del jugador local
+-- 🧩 Detectar carpeta local
 ------------------------------------------------------------
 local function detectPlayerFolder()
 	for _, folderName in ipairs({"Alices", "Students", "Teachers"}) do
@@ -67,32 +71,15 @@ local function detectPlayerFolder()
 end
 
 ------------------------------------------------------------
--- 🧩 Cache de highlights activos
-------------------------------------------------------------
-local ActiveHighlights = {}
-
-------------------------------------------------------------
--- 🧩 Obtener o crear Highlight en cache
+-- 🧩 Crear o usar Highlight
 ------------------------------------------------------------
 local function getOrCreateHighlight(model, folderName)
-	if not model or not model:IsA("Model") then return end
-
 	if ActiveHighlights[model] then
 		return ActiveHighlights[model].Highlight
 	end
 
-	local cacheName = model.Name .. "_HL_" .. folderName
-	local cached = HighlightCache:FindFirstChild(cacheName)
-
-	if cached and cached:IsA("Highlight") then
-		cached.Adornee = model
-		cached.Enabled = false
-		ActiveHighlights[model] = { Highlight = cached, Folder = folderName }
-		return cached
-	end
-
 	local highlight = Instance.new("Highlight")
-	highlight.Name = cacheName
+	highlight.Name = model.Name .. "_HL_" .. folderName
 	highlight.Adornee = model
 	highlight.Enabled = false
 	highlight.OutlineColor = COLORS[folderName] or Color3.fromRGB(255, 255, 255)
@@ -105,28 +92,50 @@ local function getOrCreateHighlight(model, folderName)
 end
 
 ------------------------------------------------------------
--- 🧩 Desactivar Highlight sin destruirlo
+-- 🧩 Desactivar y limpiar highlight
 ------------------------------------------------------------
 local function disableHighlight(model)
 	local data = ActiveHighlights[model]
 	if data and data.Highlight then
 		data.Highlight.Enabled = false
 		data.Highlight.Adornee = nil
+		data.Highlight:Destroy()
 	end
 	ActiveHighlights[model] = nil
+	HeadCache[model] = nil
 end
 
 ------------------------------------------------------------
--- 🧩 Escanear una carpeta según reglas del jugador local
+-- 🧩 Control de distancia
 ------------------------------------------------------------
-local function scanFolder(folder, localFolderName)
-	for _, model in ipairs(folder:GetChildren()) do
-		if not model:IsA("Model") then
+local function updateHighlightDistance()
+	local myChar = LocalPlayer.Character
+	local myHead = getRealHead(myChar)
+	if not myHead then return end
+	local myPos = myHead.Position
+
+	for model, data in pairs(ActiveHighlights) do
+		local hl = data.Highlight
+		local targetHead = getRealHead(model)
+		if not hl or not targetHead then
 			disableHighlight(model)
 			continue
 		end
 
-		if model.Name == LocalPlayer.Name then
+		local dist = (targetHead.Position - myPos).Magnitude
+		hl.Enabled = dist <= MAX_RENDER_DISTANCE
+	end
+end
+
+------------------------------------------------------------
+-- 🧩 Escanear carpetas según rol (dividido en frames)
+------------------------------------------------------------
+local function scanFolder(folder, localFolderName)
+	local models = folder:GetChildren()
+	for _, model in ipairs(models) do
+		task.wait() -- 🔥 reduce pico de FPS
+		if not model:IsA("Model") or model.Name == LocalPlayer.Name then
+			disableHighlight(model)
 			continue
 		end
 
@@ -136,24 +145,13 @@ local function scanFolder(folder, localFolderName)
 			continue
 		end
 
-		-- ⚙️ Reglas de visibilidad según carpeta local
 		local allowHighlight = false
-
-		if localFolderName == "Teachers" then
-			-- Teachers solo ven Alices
-			if folder.Name == "Alices" then
-				allowHighlight = true
-			end
-		elseif localFolderName == "Alices" then
-			-- Alices solo ven Teachers
-			if folder.Name == "Teachers" then
-				allowHighlight = true
-			end
-		elseif localFolderName == "Students" then
-			-- Students ven Alices y Teachers
-			if folder.Name == "Alices" or folder.Name == "Teachers" then
-				allowHighlight = true
-			end
+		if localFolderName == "Teachers" and folder.Name == "Alices" then
+			allowHighlight = true
+		elseif localFolderName == "Alices" and folder.Name == "Teachers" then
+			allowHighlight = true
+		elseif localFolderName == "Students" and (folder.Name == "Alices" or folder.Name == "Teachers") then
+			allowHighlight = true
 		end
 
 		if not allowHighlight then
@@ -166,81 +164,50 @@ local function scanFolder(folder, localFolderName)
 			hl.Adornee = model
 		end
 	end
+	updateHighlightDistance()
 end
 
 ------------------------------------------------------------
--- 🧩 Control visual por distancia
+-- 🧩 Escaneo principal
 ------------------------------------------------------------
-RunService.Heartbeat:Connect(function()
-	local myChar = LocalPlayer.Character
-	local myHead = getRealHead(myChar)
-	if not myHead then return end
-
-	local ok, myPos = pcall(function() return myHead.Position end)
-	if not ok then return end
-
-	for model, data in pairs(ActiveHighlights) do
-		local hl = data.Highlight
-		if not hl then continue end
-
-		if not model or not model.Parent then
-			disableHighlight(model)
-			continue
-		end
-
-		local targetHead = getRealHead(model)
-		if not targetHead then
-			disableHighlight(model)
-			continue
-		end
-
-		local success, dist = pcall(function()
-			return (targetHead.Position - myPos).Magnitude
-		end)
-
-		if success then
-			hl.Enabled = dist <= MAX_RENDER_DISTANCE
-		else
-			hl.Enabled = false
-		end
-	end
-end)
-
-------------------------------------------------------------
--- 🧩 Escaneo principal (controlado por carpeta local)
-------------------------------------------------------------
-local lastScanTick = 0
 local function performScan()
-	local now = tick()
-	if now - lastScanTick < CHECK_INTERVAL then return end
-	lastScanTick = now
-
 	local myFolder = detectPlayerFolder()
 	if not myFolder then return end
 	local myFolderName = myFolder.Name
 
 	for folderName, folder in pairs(Folders) do
-		scanFolder(folder, myFolderName)
+		task.defer(function()
+			scanFolder(folder, myFolderName)
+		end)
 	end
 end
 
 ------------------------------------------------------------
--- 🧩 Escaneo automático con intervalos
+-- 🧩 Eventos principales
 ------------------------------------------------------------
+
+LocalPlayer.CharacterAdded:Connect(function()
+	task.wait(1)
+	performScan()
+end)
+
+-- Actualizar al moverse el jugador
 task.spawn(function()
-	while task.wait(CHECK_INTERVAL) do
-		performScan()
+	while LocalPlayer.Character == nil do task.wait() end
+	local head = getRealHead(LocalPlayer.Character)
+	if head then
+		head:GetPropertyChangedSignal("Position"):Connect(updateHighlightDistance)
 	end
 end)
 
-------------------------------------------------------------
--- 🧩 Eventos de cambio de contenido
-------------------------------------------------------------
+-- Reaccionar a cambios en carpetas
 for _, folder in pairs(Folders) do
-	folder.ChildAdded:Connect(function()
+	folder.ChildAdded:Connect(function(child)
 		task.defer(performScan)
 	end)
 	folder.ChildRemoved:Connect(function(child)
 		disableHighlight(child)
 	end)
 end
+
+performScan()
