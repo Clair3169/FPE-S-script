@@ -141,15 +141,16 @@ local function checkSleepState()
 	local newAsleep = parent and (parent.Name == "Alices" or parent.Name == "Teachers")
 
 	if newAsleep ~= asleep then
-		asleep = newAsleep
-		if asleep then
-			for _, hl in pairs(highlights) do
-				hl.Enabled = false
-			end
-		else
-			updateHighlightsInRange()
+	asleep = newAsleep
+	if asleep then
+		for _, hl in pairs(highlights) do
+			hl.Enabled = false
 		end
+	else
+		-- 🔹 Reforzamos la activación tras despertar o reaparecer
+		task.defer(updateHighlightsInRange)
 	end
+ end
 end
 
 player.CharacterAdded:Connect(function(char)
