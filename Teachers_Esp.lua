@@ -99,10 +99,7 @@ local function disableHighlight(model)
 	if data and data.Highlight then
 		data.Highlight.Enabled = false
 		data.Highlight.Adornee = nil
-		data.Highlight:Destroy()
 	end
-	ActiveHighlights[model] = nil
-	HeadCache[model] = nil
 end
 
 ------------------------------------------------------------
@@ -192,13 +189,24 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- Actualizar al moverse el jugador
-task.spawn(function()
-	while LocalPlayer.Character == nil do task.wait() end
-	local head = getRealHead(LocalPlayer.Character)
-	if head then
-		head:GetPropertyChangedSignal("Position"):Connect(updateHighlightDistance)
+local function connectHeadPosition()
+	local char = LocalPlayer.Character
+	if not char then return end
+	local head = getRealHead(char)
+	if not head then return end
+
+	head:GetPropertyChangedSignal("Position"):Connect(updateHighlightDistance)
+end
+
+LocalPlayer.CharacterRemoving:Connect(function()
+	for _, data in pairs(ActiveHighlights) do
+		if data.Highlight then
+			data.Highlight.Enabled = false
+		end
 	end
 end)
+
+connectHeadPosition()
 
 -- Reaccionar a cambios en carpetas
 for _, folder in pairs(Folders) do
