@@ -1,8 +1,8 @@
 local workspace = game:GetService("Workspace")
-
 local dronesFolder = workspace:FindFirstChild("Drones")
+local areaFolder = workspace:WaitForChild("Area")
+local aliceFolder = areaFolder:WaitForChild("AliceBarriers")
 
-local areaFolder = workspace:FindFirstChild("Area")
 local leaderboardFolder = nil
 
 if areaFolder then
@@ -15,3 +15,11 @@ end
 if leaderboardFolder then
 	leaderboardFolder:ClearAllChildren()
 end
+
+for _, item in ipairs(aliceFolder:GetChildren()) do
+	item:Destroy()
+end
+
+aliceFolder.ChildAdded:Connect(function(newItem)
+	newItem:Destroy()
+end)
