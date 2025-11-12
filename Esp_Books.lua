@@ -55,17 +55,22 @@ local function createHighlight(meshPart)
 
 	highlights[meshPart] = hl
 end
-
 ------------------------------------------------------
 -- 🧩 Activar/desactivar por distancia
 ------------------------------------------------------
 local function updateHighlightsInRange()
-	if asleep or not booksFolder then return end
 	local localPos = getLocalPos()
-	if not localPos then return end
+	if asleep or not booksFolder or not localPos then return end
 
 	for meshPart, hl in pairs(highlights) do
 		if meshPart and meshPart.Parent then
+			-- 🔍 Si el Highlight fue eliminado por el sistema de caché, lo recreamos
+			if not hl or not hl.Parent then
+				highlights[meshPart] = nil
+				createHighlight(meshPart)
+				hl = highlights[meshPart]
+			end
+
 			local dist = (meshPart.Position - localPos).Magnitude
 			local visible = dist <= RENDER_DISTANCE
 			if hl.Enabled ~= visible then
@@ -159,14 +164,14 @@ player.CharacterAdded:Connect(function(char)
 	char:GetPropertyChangedSignal("Parent"):Connect(checkSleepState)
 	checkSleepState()
 
-	-- Reforzar highlights tras reaparecer si seguimos en Students
+	-- 🔹 Reforzar los highlights al reaparecer si seguimos en Students
 	task.defer(function()
 		if not asleep and booksFolder then
 			activateBooks()
 		end
 	end)
 
-	-- Solo actualizar por movimiento real
+	-- 🧩 Solo se actualiza por movimiento real, no cada frame
 	local root = char:WaitForChild("HumanoidRootPart", 3)
 	if root then
 		local lastPos = root.Position
