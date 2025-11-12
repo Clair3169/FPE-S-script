@@ -1,4 +1,4 @@
-task.wait(9)
+task.wait(7)
 
 local player = game.Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
@@ -8,7 +8,19 @@ hasThirdPerson.Name = "ThirdPersonEnabled"
 hasThirdPerson.Value = false
 hasThirdPerson.Parent = player
 
+local SoundService = game:GetService("SoundService")
+local warningSound = Instance.new("Sound")
+warningSound.SoundId = "rbxassetid://8382337318" -- <-- ¡Recuerda cambiar este ID!
+warningSound.Parent = SoundService
+
 local bindableFunction = Instance.new("BindableFunction")
+
+warningSound:Play()
+
+warningSound.Ended:Connect(function()
+    warningSound:Destroy()
+end)
+
 bindableFunction.OnInvoke = function(buttonClicked)
 	if buttonClicked == "Yess!!" then
 		hasThirdPerson.Value = true
