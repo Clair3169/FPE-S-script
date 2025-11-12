@@ -1,4 +1,4 @@
--- 🟢 Student Highlighter Optimizado (con auto-verificación estable)
+-- 🟢 Student Highlighter Optimizado (con limpieza de jugadores desconectados)
 repeat task.wait() until game:IsLoaded()
 
 ------------------------------------------------------------
@@ -8,7 +8,6 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local localPlayer = Players.LocalPlayer
-
 local studentsFolder = Workspace:WaitForChild("Students")
 local VALID_FOLDERS = { "Alices", "Teachers" }
 
@@ -29,7 +28,7 @@ local visibleStudents = {}
 ------------------------------------------------------------
 -- 🔧 Cache persistente
 ------------------------------------------------------------
-local highlightCache = Workspace:FindFirstChild("HighlightCache_Students") or Instance.new("Folder")
+local highlightCache = Workspace:FindFirstChild("HighlightStudents_Main") or Instance.new("Folder")
 highlightCache.Name = "HighlightStudents_Main"
 highlightCache.Parent = Workspace
 
@@ -205,14 +204,28 @@ studentsFolder.ChildRemoved:Connect(function(child)
 	end
 	activeHighlights[child] = nil
 	visibleStudents[child] = nil
+
+	-- 🔥 Limpieza directa del highlight en cache si existe
+	local cached = highlightCache:FindFirstChild(child.Name .. "_HL_Student")
+	if cached and cached:IsA("Highlight") then
+		cached:Destroy()
+	end
 end)
 
+-- 🧹 Limpieza segura cuando un jugador abandona el juego
 Players.PlayerRemoving:Connect(function(player)
 	for student, hl in pairs(activeHighlights) do
 		if student.Name == player.Name then
 			if hl then hl:Destroy() end
 			activeHighlights[student] = nil
 			visibleStudents[student] = nil
+		end
+	end
+
+	-- 🔥 Eliminar cualquier highlight residual en cache
+	for _, obj in ipairs(highlightCache:GetChildren()) do
+		if obj:IsA("Highlight") and obj.Name:find(player.Name .. "_HL_Student") then
+			obj:Destroy()
 		end
 	end
 end)
@@ -262,7 +275,7 @@ localPlayer.CharacterRemoving:Connect(function()
 end)
 
 ------------------------------------------------------------
--- ♻️ Limpieza
+-- ♻️ Limpieza global
 ------------------------------------------------------------
 Workspace.DescendantRemoving:Connect(function(obj)
 	if activeHighlights[obj] then
@@ -277,7 +290,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
 end)
 
 ------------------------------------------------------------
--- 🔁 Auto-verificador (solución al bug reportado)
+-- 🔁 Auto-verificador (mejorado: elimina highlights huérfanos)
 ------------------------------------------------------------
 task.spawn(function()
 	while task.wait(5) do
@@ -291,6 +304,16 @@ task.spawn(function()
 				end
 			end
 		end
+
+		-- 🔥 Limpieza de highlights huérfanos (jugadores que ya no existen)
+		for student, hl in pairs(activeHighlights) do
+			if not student or not student.Parent then
+				if hl then hl:Destroy() end
+				activeHighlights[student] = nil
+				visibleStudents[student] = nil
+			end
+		end
+
 		if missing then
 			updateVisibleStudents()
 		end
