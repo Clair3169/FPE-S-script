@@ -24,7 +24,7 @@ local visibleStudents = {}
 
 -- 🔧 Carpeta cache persistente
 local highlightCache = Workspace:FindFirstChild("HighlightCache_Students") or Instance.new("Folder")
-highlightCache.Name = "HighlightCache_Students"
+highlightCache.Name = "HighlightStudents_Main"
 highlightCache.Parent = Workspace
 
 ------------------------------------------------------------
@@ -48,7 +48,7 @@ end
 ------------------------------------------------------------
 local function getOrCreateHighlight(character)
 	if not character or not character:IsA("Model") then return end
-	if not systemActive then return end -- ❗ evita crear highlights si no estás en carpeta válida
+	if not systemActive then return end
 
 	if activeHighlights[character] then
 		return activeHighlights[character]
@@ -82,7 +82,7 @@ end
 local function updateHighlightState(character, state)
 	local highlight = activeHighlights[character]
 	if not highlight then
-		if not state then return end -- no intentes crear si está desactivado
+		if not state then return end
 		highlight = getOrCreateHighlight(character)
 	end
 	if not highlight then return end
@@ -122,14 +122,12 @@ local function updateVisibleStudents()
 		newVisible[distances[i][1]] = true
 	end
 
-	-- Desactivar los que ya no están visibles
 	for student in pairs(visibleStudents) do
 		if not newVisible[student] then
 			updateHighlightState(student, false)
 		end
 	end
 
-	-- Activar los nuevos visibles
 	for student in pairs(newVisible) do
 		if not visibleStudents[student] then
 			updateHighlightState(student, true)
@@ -153,6 +151,34 @@ local function isInValidFolder()
 	return false
 end
 
+-- 🕒 Eliminación retardada de highlights si el jugador sale de carpeta válida
+local cleanupTimer = nil
+local function scheduleHighlightCleanup()
+	if cleanupTimer then return end
+	cleanupTimer = task.delay(50, function()
+		if systemActive then
+			cleanupTimer = nil
+			return
+		end
+
+		for student, hl in pairs(activeHighlights) do
+			if hl and hl.Parent then
+				hl:Destroy()
+			end
+		end
+		activeHighlights = {}
+		visibleStudents = {}
+
+		for _, obj in ipairs(highlightCache:GetChildren()) do
+			if obj:IsA("Highlight") then
+				obj:Destroy()
+			end
+		end
+
+		cleanupTimer = nil
+	end)
+end
+
 local function updateSystemStatus(force)
 	local shouldBeActive = isInValidFolder()
 	if shouldBeActive == systemActive and not force then return end
@@ -161,15 +187,13 @@ local function updateSystemStatus(force)
 	if systemActive then
 		updateVisibleStudents()
 	else
-		-- Apagar todos los highlights y limpiar cache
-		for student, hl in pairs(activeHighlights) do
+		for _, hl in pairs(activeHighlights) do
 			if hl then
 				hl.Enabled = false
 				hl.Adornee = nil
 			end
 		end
-		activeHighlights = {}
-		visibleStudents = {}
+		scheduleHighlightCleanup()
 	end
 end
 
@@ -177,7 +201,7 @@ end
 -- 🧩 Monitor de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
-	if not systemActive then return end -- ❗ no crear si no estás en carpeta válida
+	if not systemActive then return end
 	if child:IsA("Model") and child ~= localPlayer.Character then
 		getOrCreateHighlight(child)
 		task.defer(updateVisibleStudents)
@@ -194,10 +218,29 @@ studentsFolder.ChildRemoved:Connect(function(child)
 	visibleStudents[child] = nil
 end)
 
+Players.PlayerRemoving:Connect(function(player)
+	for student, hl in pairs(activeHighlights) do
+		if student.Name == player.Name then
+			if hl then hl:Destroy() end
+			activeHighlights[student] = nil
+			visibleStudents[student] = nil
+		end
+	end
+end)
+
 ------------------------------------------------------------
 -- 🧩 Control del personaje local
 ------------------------------------------------------------
 local function onCharacterAdded(character)
+	for _, hl in pairs(activeHighlights) do
+		if hl then
+			hl.Enabled = false
+			hl.Adornee = nil
+		end
+	end
+	activeHighlights = {}
+	visibleStudents = {}
+
 	updateSystemStatus(true)
 
 	task.defer(function()
@@ -215,7 +258,9 @@ local function onCharacterAdded(character)
 		end)
 	end)
 
-	character:GetPropertyChangedSignal("Parent"):Connect(updateSystemStatus)
+	character:GetPropertyChangedSignal("Parent"):Connect(function()
+		updateSystemStatus()
+	end)
 end
 
 if localPlayer.Character then
@@ -239,7 +284,6 @@ Workspace.DescendantRemoving:Connect(function(obj)
 		if hl then
 			hl.Enabled = false
 			hl.Adornee = nil
-			-- sin :Destroy() para no generar lag
 		end
 		activeHighlights[obj] = nil
 		visibleStudents[obj] = nil
