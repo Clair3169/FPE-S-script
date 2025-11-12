@@ -1,4 +1,4 @@
--- 🧿 Student Highlighter (Reglas estrictas de creación)
+-- 🧿 Student Highlighter (Reglas estrictas de creación - FIX AutoRespawn)
 repeat task.wait() until game:IsLoaded()
 
 ------------------------------------------------------------
@@ -31,7 +31,7 @@ local COLORS = {
 -- Caches
 ------------------------------------------------------------
 local HighlightCache = Workspace:FindFirstChild("HighlightCache_Main") or Instance.new("Folder")
-HighlightCache.Name = "HighlightTeachers_Main"
+HighlightCache.Name = "HighlightCache_Main"
 HighlightCache.Parent = Workspace
 
 local ActiveHighlights = {}
@@ -73,38 +73,32 @@ local function detectPlayerFolder()
 	return nil
 end
 
--- Reglas estrictas: devuelve true solo si, según tu carpeta, debes ver objetivos de targetFolderName
 local function canSeeTarget(localFolderName, targetFolderName)
 	if localFolderName == "Teachers" then
-		-- Teacher solo ve Alices
 		return targetFolderName == "Alices"
 	elseif localFolderName == "Alices" then
-		-- Alice solo ve Teachers
 		return targetFolderName == "Teachers"
 	elseif localFolderName == "Students" then
-		-- Student ve Alices y Teachers
 		return targetFolderName == "Alices" or targetFolderName == "Teachers"
 	end
 	return false
 end
 
 ------------------------------------------------------------
--- Highlight: crear solo si es necesario
+-- Highlight handling
 ------------------------------------------------------------
 local function getOrCreateHighlight(model, folderName)
-	-- Protección: no crear si ya existe
 	if ActiveHighlights[model] and ActiveHighlights[model].Highlight then
 		return ActiveHighlights[model].Highlight
 	end
 
-	-- Crear highlight (inicialmente desactivado)
 	local hl = Instance.new("Highlight")
 	hl.Name = model.Name .. "_HL_" .. folderName
 	hl.Adornee = model
 	hl.OutlineColor = COLORS[folderName] or Color3.new(1,1,1)
 	hl.FillTransparency = 1
 	hl.OutlineTransparency = 0
-	hl.Enabled = false -- inicialmente desactivado, se activa por distancia
+	hl.Enabled = false
 	hl.Parent = HighlightCache
 
 	ActiveHighlights[model] = { Highlight = hl, Folder = folderName, InRange = false, Distance = math.huge }
@@ -121,7 +115,7 @@ local function disableHighlight(model)
 end
 
 ------------------------------------------------------------
--- Actualización por distancia (hiberna en lugar de destruir por rango)
+-- Actualización por distancia
 ------------------------------------------------------------
 local function updateHighlightDistance()
 	local char = LocalPlayer.Character
@@ -131,10 +125,8 @@ local function updateHighlightDistance()
 
 	local aliceDistances, teacherDistances = {}, {}
 
-	-- Recalcular distancias para los highlights existentes
 	for model, data in pairs(ActiveHighlights) do
 		local targetHead = getRealHead(model)
-		-- si el modelo fue eliminado o no tiene cabeza → destruir
 		if not targetHead or not model:IsDescendantOf(Workspace) then
 			disableHighlight(model)
 			continue
@@ -143,11 +135,8 @@ local function updateHighlightDistance()
 		local dist = (targetHead.Position - myPos).Magnitude
 		data.Distance = dist
 
-		-- Si fuera de rango, hibernar (desactivar), pero no destruir
 		if dist > MAX_RENDER_DISTANCE then
-			if data.Highlight then
-				data.Highlight.Enabled = false
-			end
+			if data.Highlight then data.Highlight.Enabled = false end
 			data.InRange = false
 		else
 			data.InRange = true
@@ -159,12 +148,10 @@ local function updateHighlightDistance()
 		end
 	end
 
-	-- Ordenar por distancia y seleccionar los que deben mostrarse
 	table.sort(aliceDistances, function(a,b) return a[2] < b[2] end)
 	table.sort(teacherDistances, function(a,b) return a[2] < b[2] end)
 
 	local visible = {}
-
 	for i = 1, math.min(#aliceDistances, MAX_VISIBLE_ALICES) do
 		visible[aliceDistances[i][1]] = true
 	end
@@ -172,55 +159,41 @@ local function updateHighlightDistance()
 		visible[teacherDistances[i][1]] = true
 	end
 
-	-- Activar solo los necesarios; los demás quedan hibernando (Enabled = false)
 	for model, data in pairs(ActiveHighlights) do
 		local hl = data.Highlight
 		if hl then
-			if data.InRange and visible[model] then
-				-- activar si está en rango y es uno de los más cercanos
-				hl.Enabled = true
-			else
-				hl.Enabled = false
-			end
+			hl.Enabled = data.InRange and visible[model] or false
 		end
 	end
 end
 
 ------------------------------------------------------------
--- Escaneo inicial filtrado y estricto
+-- Escaneo completo
 ------------------------------------------------------------
 local function performScan()
 	local myFolder = detectPlayerFolder()
 	if not myFolder then return end
 	local myFolderName = myFolder.Name
 
-	-- Solo crear highlights para carpetas que realmente puedes ver según tus reglas
 	for targetName, folder in pairs(Folders) do
 		if canSeeTarget(myFolderName, targetName) then
 			for _, model in ipairs(folder:GetChildren()) do
-				-- Seguridad: no crear highlight para quien esté en la misma carpeta que tú
 				if model:IsA("Model") and model.Name ~= LocalPlayer.Name then
-					-- Excluir modelos que pertenezcan a tu propia carpeta (duplicado de seguridad)
-					local parentFolder = model.Parent
-					if parentFolder == Folders[myFolderName] then
-						-- si el modelo está en la misma carpeta del jugador, NO crear highlight
-						continue
-					end
-
-					local head = getRealHead(model)
-					if head then
-						getOrCreateHighlight(model, targetName)
+					if model.Parent ~= Folders[myFolderName] then
+						local head = getRealHead(model)
+						if head then
+							getOrCreateHighlight(model, targetName)
+						end
 					end
 				end
 			end
 		end
 	end
-
 	updateHighlightDistance()
 end
 
 ------------------------------------------------------------
--- Movimiento del jugador (conexión segura)
+-- Movimiento
 ------------------------------------------------------------
 local lastPos = Vector3.new(0,0,0)
 local function connectHeadMovement()
@@ -240,11 +213,10 @@ local function connectHeadMovement()
 end
 
 ------------------------------------------------------------
--- Eventos (ChildAdded/ChildRemoved estrictos)
+-- Eventos
 ------------------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function()
 	task.wait(1)
-	-- Hibernar todos los highlights actuales (no destruir)
 	for _, data in pairs(ActiveHighlights) do
 		if data.Highlight then data.Highlight.Enabled = false end
 	end
@@ -258,25 +230,15 @@ LocalPlayer.CharacterRemoving:Connect(function()
 	end
 end)
 
--- ChildAdded: solo crear si la regla lo permite (según carpeta actual)
 for _, folder in pairs(Folders) do
 	folder.ChildAdded:Connect(function(model)
 		task.defer(function()
 			local myFolder = detectPlayerFolder()
 			if not myFolder then return end
 			local myFolderName = myFolder.Name
+			if not canSeeTarget(myFolderName, folder.Name) then return end
+			if model.Parent == Folders[myFolderName] then return end
 
-			-- Solo si tú (local) tienes permiso de ver esta carpeta
-			if not canSeeTarget(myFolderName, folder.Name) then
-				return
-			end
-
-			-- No crear highlight para alguien de tu misma carpeta
-			if model.Parent == Folders[myFolderName] then
-				return
-			end
-
-			-- Validación final
 			if model:IsA("Model") and model.Name ~= LocalPlayer.Name then
 				local head = getRealHead(model)
 				if head then
@@ -288,12 +250,10 @@ for _, folder in pairs(Folders) do
 	end)
 
 	folder.ChildRemoved:Connect(function(model)
-		-- Si un modelo sale, limpiarlo totalmente
 		disableHighlight(model)
 	end)
 end
 
--- Limpieza si algo es eliminado desde otro lugar
 Workspace.DescendantRemoving:Connect(function(obj)
 	if ActiveHighlights[obj] then
 		disableHighlight(obj)
@@ -301,14 +261,35 @@ Workspace.DescendantRemoving:Connect(function(obj)
 end)
 
 ------------------------------------------------------------
--- Revisión ligera periódica
+-- 🔁 Auto-verificador ligero (solución al problema reportado)
 ------------------------------------------------------------
 task.spawn(function()
-	while task.wait(3) do
-		updateHighlightDistance()
+	while task.wait(5) do
+		local missing = false
+		local myFolder = detectPlayerFolder()
+		if myFolder then
+			local myFolderName = myFolder.Name
+			for targetName, folder in pairs(Folders) do
+				if canSeeTarget(myFolderName, targetName) then
+					for _, model in ipairs(folder:GetChildren()) do
+						if model:IsA("Model") and model.Name ~= LocalPlayer.Name then
+							if not ActiveHighlights[model] then
+								missing = true
+								break
+							end
+						end
+					end
+				end
+			end
+		end
+		if missing then
+			performScan()
+		end
 	end
 end)
 
+------------------------------------------------------------
 -- Inicio
+------------------------------------------------------------
 performScan()
 connectHeadMovement()
