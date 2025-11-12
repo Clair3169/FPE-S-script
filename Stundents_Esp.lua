@@ -48,6 +48,7 @@ end
 ------------------------------------------------------------
 local function getOrCreateHighlight(character)
 	if not character or not character:IsA("Model") then return end
+	if not systemActive then return end -- ❗ evita crear highlights si no estás en carpeta válida
 
 	if activeHighlights[character] then
 		return activeHighlights[character]
@@ -79,8 +80,13 @@ end
 -- 🧩 Cambiar estado del Highlight
 ------------------------------------------------------------
 local function updateHighlightState(character, state)
-	local highlight = getOrCreateHighlight(character)
+	local highlight = activeHighlights[character]
+	if not highlight then
+		if not state then return end -- no intentes crear si está desactivado
+		highlight = getOrCreateHighlight(character)
+	end
 	if not highlight then return end
+
 	highlight.Enabled = state
 	highlight.Adornee = character
 end
@@ -155,9 +161,14 @@ local function updateSystemStatus(force)
 	if systemActive then
 		updateVisibleStudents()
 	else
-		for student in pairs(visibleStudents) do
-			updateHighlightState(student, false)
+		-- Apagar todos los highlights y limpiar cache
+		for student, hl in pairs(activeHighlights) do
+			if hl then
+				hl.Enabled = false
+				hl.Adornee = nil
+			end
 		end
+		activeHighlights = {}
 		visibleStudents = {}
 	end
 end
@@ -166,26 +177,18 @@ end
 -- 🧩 Monitor de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
+	if not systemActive then return end -- ❗ no crear si no estás en carpeta válida
 	if child:IsA("Model") and child ~= localPlayer.Character then
 		getOrCreateHighlight(child)
-		if systemActive then
-			task.defer(updateVisibleStudents)
-		end
-	end
-end)
-
-task.defer(function()
-	local hl = getOrCreateHighlight(child)
-	if systemActive then
-		updateVisibleStudents()
+		task.defer(updateVisibleStudents)
 	end
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
 	local hl = activeHighlights[child]
 	if hl then
-	hl.Enabled = false
-    hl.Adornee = nil		
+		hl.Enabled = false
+		hl.Adornee = nil
 	end
 	activeHighlights[child] = nil
 	visibleStudents[child] = nil
@@ -197,7 +200,6 @@ end)
 local function onCharacterAdded(character)
 	updateSystemStatus(true)
 
-	-- Escucha el cambio de posición (en vez de usar Heartbeat)
 	task.defer(function()
 		local root = character:WaitForChild("HumanoidRootPart", 3)
 		if not root then return end
@@ -228,9 +230,8 @@ localPlayer.CharacterRemoving:Connect(function()
 	end
 end)
 
-
 ------------------------------------------------------------
--- ♻️ Limpieza automática por evento
+-- ♻️ Limpieza automática segura
 ------------------------------------------------------------
 Workspace.DescendantRemoving:Connect(function(obj)
 	if activeHighlights[obj] then
@@ -238,7 +239,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
 		if hl then
 			hl.Enabled = false
 			hl.Adornee = nil
-			hl:Destroy()
+			-- sin :Destroy() para no generar lag
 		end
 		activeHighlights[obj] = nil
 		visibleStudents[obj] = nil
