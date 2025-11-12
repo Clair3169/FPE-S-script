@@ -238,6 +238,13 @@ local function performScan()
 	if not myFolder then return end
 	local myFolderName = myFolder.Name
 
+	-- 🧹 Limpieza estricta según reglas de visibilidad
+for model, data in pairs(ActiveHighlights) do
+	if data and data.Folder and not canSeeTarget(myFolderName, data.Folder) then
+		disableHighlight(model)
+	end
+end
+
 	for targetName, folder in pairs(Folders) do
 		if canSeeTarget(myFolderName, targetName) then
 			for _, model in ipairs(folder:GetChildren()) do
