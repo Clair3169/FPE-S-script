@@ -101,6 +101,10 @@ end
 local function connectBookEvents()
 	if not booksFolder then return end
 
+	-- Solo conecta los listeners una vez usando un atributo
+	if booksFolder:GetAttribute("EventsConnected") then return end
+	booksFolder:SetAttribute("EventsConnected", true) -- Marca para evitar duplicados
+
 	booksFolder.ChildAdded:Connect(function(child)
 		if asleep then return end
 		if child:IsA("BasePart") then
@@ -110,9 +114,27 @@ local function connectBookEvents()
 	end)
 
 	booksFolder.ChildRemoved:Connect(removeHighlight)
-	activateBooks()
+	-- Ya no llamamos activateBooks aquí. Se hará en initializeBookHighlighter.
 end
 
+local function initializeBookHighlighter()
+	-- 1. Buscamos la carpeta si aún no la tenemos
+	if not booksFolder then
+		booksFolder = Workspace:FindFirstChild("Books")
+	end
+
+	-- 2. Conectamos los eventos si la encontramos (solo una vez)
+	if booksFolder then
+		connectBookEvents()
+	end
+
+	-- 3. Activamos los highlights para los libros que ya existían
+	if booksFolder and not asleep then
+		activateBooks()
+	end
+end
+
+-- Solo mantenemos la conexión de ChildAdded/Removed del Workspace aquí
 Workspace.ChildAdded:Connect(function(child)
 	if child.Name == "Books" and child:IsA("Folder") then
 		booksFolder = child
@@ -129,12 +151,7 @@ Workspace.ChildRemoved:Connect(function(child)
 	end
 end)
 
-if Workspace:FindFirstChild("Books") then
-	booksFolder = Workspace.Books
-	connectBookEvents()
-end
-
-------------------------------------------------------
+-----------------------------------------------------
 -- 🧩 Estado dormido (Alices / Teachers)
 ------------------------------------------------------
 local function checkSleepState()
@@ -156,20 +173,16 @@ local function checkSleepState()
 		end
 	end
 end
-
 ------------------------------------------------------
 -- 🧩 Evento de respawn persistente
 ------------------------------------------------------
 player.CharacterAdded:Connect(function(char)
 	char:GetPropertyChangedSignal("Parent"):Connect(checkSleepState)
 	checkSleepState()
-
-	-- 🔹 Reforzar los highlights al reaparecer si seguimos en Students
-	task.defer(function()
-		if not asleep and booksFolder then
-			activateBooks()
-		end
-	end)
+	
+	-- 🆕 INICIALIZACIÓN CLAVE: Inicializa la carpeta Books y activa highlights 
+	-- justo después de que el Character se haya cargado.
+	task.defer(initializeBookHighlighter)
 
 	-- 🧩 Solo se actualiza por movimiento real, no cada frame
 	local root = char:WaitForChild("HumanoidRootPart", 3)
@@ -190,13 +203,6 @@ end)
 if player.Character then
 	player.Character:GetPropertyChangedSignal("Parent"):Connect(checkSleepState)
 	checkSleepState()
-end
--- ----------------------------------------------------
--- ‼️ CAPA DE SEGURIDAD ADICIONAL (AÑADIR AL FINAL) ‼️
--- ----------------------------------------------------
--- Esto fuerza una segunda verificación explícita para los libros existentes
--- justo después de que el script se haya cargado e inicializado por completo.
-task.wait(1) -- Damos un breve respiro para asegurar que todo esté cargado
-if booksFolder and not asleep then
-	activateBooks()
+	-- 🆕 También inicializar para el caso en que el Character ya existe al inicio
+	task.defer(initializeBookHighlighter)
 end
