@@ -1,34 +1,40 @@
--- 🟢 Student Highlighter Optimizado (solo eventos, sin Heartbeat)
+-- 🟢 Student Highlighter Optimizado (con auto-verificación estable)
 repeat task.wait() until game:IsLoaded()
 
+------------------------------------------------------------
 -- ⚙️ Servicios
+------------------------------------------------------------
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
--- 👤 Jugador local
 local localPlayer = Players.LocalPlayer
 
--- 📂 Carpetas
 local studentsFolder = Workspace:WaitForChild("Students")
 local VALID_FOLDERS = { "Alices", "Teachers" }
 
+------------------------------------------------------------
 -- ⚙️ Configuración
+------------------------------------------------------------
 local MAX_VISIBLE = 10
 local MAX_DISTANCE = 200
 local UPDATE_THRESHOLD = 5
 
+------------------------------------------------------------
 -- 🧠 Estado
+------------------------------------------------------------
 local systemActive = false
 local activeHighlights = {}
 local visibleStudents = {}
 
--- 🔧 Carpeta cache persistente
+------------------------------------------------------------
+-- 🔧 Cache persistente
+------------------------------------------------------------
 local highlightCache = Workspace:FindFirstChild("HighlightCache_Students") or Instance.new("Folder")
 highlightCache.Name = "HighlightStudents_Main"
 highlightCache.Parent = Workspace
 
 ------------------------------------------------------------
--- 🧩 Obtener posición del modelo
+-- 🔍 Utilidades
 ------------------------------------------------------------
 local function getModelPosition(model)
 	if not model or not model:IsA("Model") then return nil end
@@ -43,12 +49,8 @@ local function getModelPosition(model)
 	return nil
 end
 
-------------------------------------------------------------
--- 🧩 Crear o recuperar Highlight de cache
-------------------------------------------------------------
 local function getOrCreateHighlight(character)
-	if not character or not character:IsA("Model") then return end
-	if not systemActive then return end
+	if not character or not character:IsA("Model") or not systemActive then return end
 
 	if activeHighlights[character] then
 		return activeHighlights[character]
@@ -76,23 +78,19 @@ local function getOrCreateHighlight(character)
 	return highlight
 end
 
-------------------------------------------------------------
--- 🧩 Cambiar estado del Highlight
-------------------------------------------------------------
 local function updateHighlightState(character, state)
 	local highlight = activeHighlights[character]
-	if not highlight then
-		if not state then return end
+	if not highlight and state then
 		highlight = getOrCreateHighlight(character)
 	end
-	if not highlight then return end
-
-	highlight.Enabled = state
-	highlight.Adornee = character
+	if highlight then
+		highlight.Enabled = state
+		highlight.Adornee = character
+	end
 end
 
 ------------------------------------------------------------
--- 🧩 Actualizar lista visible
+-- 🎯 Actualizar visibles
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
@@ -113,9 +111,7 @@ local function updateVisibleStudents()
 		end
 	end
 
-	table.sort(distances, function(a, b)
-		return a[2] < b[2]
-	end)
+	table.sort(distances, function(a, b) return a[2] < b[2] end)
 
 	local newVisible = {}
 	for i = 1, math.min(MAX_VISIBLE, #distances) do
@@ -138,7 +134,7 @@ local function updateVisibleStudents()
 end
 
 ------------------------------------------------------------
--- 🧩 Verificar si el jugador puede usar el sistema
+-- 🔒 Estado del sistema
 ------------------------------------------------------------
 local function isInValidFolder()
 	local char = localPlayer.Character
@@ -151,20 +147,14 @@ local function isInValidFolder()
 	return false
 end
 
--- 🕒 Eliminación retardada de highlights si el jugador sale de carpeta válida
 local cleanupTimer = nil
 local function scheduleHighlightCleanup()
 	if cleanupTimer then return end
 	cleanupTimer = task.delay(50, function()
-		if systemActive then
-			cleanupTimer = nil
-			return
-		end
+		if systemActive then cleanupTimer = nil return end
 
 		for student, hl in pairs(activeHighlights) do
-			if hl and hl.Parent then
-				hl:Destroy()
-			end
+			if hl then hl:Destroy() end
 		end
 		activeHighlights = {}
 		visibleStudents = {}
@@ -174,7 +164,6 @@ local function scheduleHighlightCleanup()
 				obj:Destroy()
 			end
 		end
-
 		cleanupTimer = nil
 	end)
 end
@@ -198,7 +187,7 @@ local function updateSystemStatus(force)
 end
 
 ------------------------------------------------------------
--- 🧩 Monitor de Students
+-- 🧍‍♂️ Eventos de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if not systemActive then return end
@@ -229,14 +218,11 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 ------------------------------------------------------------
--- 🧩 Control del personaje local
+-- 👤 Personaje local
 ------------------------------------------------------------
 local function onCharacterAdded(character)
 	for _, hl in pairs(activeHighlights) do
-		if hl then
-			hl.Enabled = false
-			hl.Adornee = nil
-		end
+		if hl then hl.Enabled = false hl.Adornee = nil end
 	end
 	activeHighlights = {}
 	visibleStudents = {}
@@ -276,7 +262,7 @@ localPlayer.CharacterRemoving:Connect(function()
 end)
 
 ------------------------------------------------------------
--- ♻️ Limpieza automática segura
+-- ♻️ Limpieza
 ------------------------------------------------------------
 Workspace.DescendantRemoving:Connect(function(obj)
 	if activeHighlights[obj] then
@@ -287,5 +273,26 @@ Workspace.DescendantRemoving:Connect(function(obj)
 		end
 		activeHighlights[obj] = nil
 		visibleStudents[obj] = nil
+	end
+end)
+
+------------------------------------------------------------
+-- 🔁 Auto-verificador (solución al bug reportado)
+------------------------------------------------------------
+task.spawn(function()
+	while task.wait(5) do
+		if not systemActive then continue end
+		local missing = false
+		for _, student in ipairs(studentsFolder:GetChildren()) do
+			if student:IsA("Model") and student ~= localPlayer.Character then
+				if not activeHighlights[student] then
+					missing = true
+					break
+				end
+			end
+		end
+		if missing then
+			updateVisibleStudents()
+		end
 	end
 end)
