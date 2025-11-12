@@ -191,3 +191,12 @@ if player.Character then
 	player.Character:GetPropertyChangedSignal("Parent"):Connect(checkSleepState)
 	checkSleepState()
 end
+-- ----------------------------------------------------
+-- ‼️ CAPA DE SEGURIDAD ADICIONAL (AÑADIR AL FINAL) ‼️
+-- ----------------------------------------------------
+-- Esto fuerza una segunda verificación explícita para los libros existentes
+-- justo después de que el script se haya cargado e inicializado por completo.
+task.wait(1) -- Damos un breve respiro para asegurar que todo esté cargado
+if booksFolder and not asleep then
+	activateBooks()
+end
