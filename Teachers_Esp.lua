@@ -99,7 +99,7 @@ end
 
 local function canSeeTarget(localFolderName, targetFolderName)
 	if localFolderName == "Teachers" then
-		return targetFolderName == "Alices"
+		return targetFolderName == "Alices" -- 🔒 Solo Alices visibles
 	elseif localFolderName == "Alices" then
 		return targetFolderName == "Teachers"
 	elseif localFolderName == "Students" then
