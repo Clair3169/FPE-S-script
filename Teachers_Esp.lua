@@ -31,7 +31,7 @@ local COLORS = {
 -- Caches
 ------------------------------------------------------------
 local HighlightCache = Workspace:FindFirstChild("HighlightCache_Main") or Instance.new("Folder")
-HighlightCache.Name = "HighlightCache_Main"
+HighlightCache.Name = "HighlightTeachers_Main"
 HighlightCache.Parent = Workspace
 
 local ActiveHighlights = {}
