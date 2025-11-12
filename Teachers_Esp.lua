@@ -16,6 +16,9 @@ local Folders = {
 
 --// Configuración
 local MAX_RENDER_DISTANCE = 250
+local UPDATE_THRESHOLD = 5 -- (Copiado del Script 1) Umbral de movimiento para actualizar
+local MAX_VISIBLE_ALICES = 2
+local MAX_VISIBLE_TEACHERS = 4
 
 --// Colores
 local COLORS = {
@@ -103,7 +106,7 @@ local function disableHighlight(model)
 end
 
 ------------------------------------------------------------
--- 🧩 Control de distancia
+-- 🧩 Control de distancia (Versión 2.0 con Límites)
 ------------------------------------------------------------
 local function updateHighlightDistance()
 	local myChar = LocalPlayer.Character
@@ -111,16 +114,60 @@ local function updateHighlightDistance()
 	if not myHead then return end
 	local myPos = myHead.Position
 
+	local aliceDistances = {}
+	local teacherDistances = {}
+	
+	-- 1. Calcular distancias y clasificar por equipo
 	for model, data in pairs(ActiveHighlights) do
 		local hl = data.Highlight
 		local targetHead = getRealHead(model)
+
 		if not hl or not targetHead then
 			disableHighlight(model)
 			continue
 		end
 
 		local dist = (targetHead.Position - myPos).Magnitude
-		hl.Enabled = dist <= MAX_RENDER_DISTANCE
+
+		if dist > MAX_RENDER_DISTANCE then
+			hl.Enabled = false -- Desactivar si está fuera de rango máximo
+			continue
+		end
+		
+		-- Clasificar por carpeta para aplicar límites
+		if data.Folder == "Alices" then
+			table.insert(aliceDistances, {model, dist})
+		elseif data.Folder == "Teachers" then
+			table.insert(teacherDistances, {model, dist})
+		end
+	end
+
+	-- 2. Ordenar las listas por distancia (más cercano primero)
+	table.sort(aliceDistances, function(a, b) return a[2] < b[2] end)
+	table.sort(teacherDistances, function(a, b) return a[2] < b[2] end)
+
+	local newVisible = {} -- Un "mapa" para saber quién debe estar visible
+
+	-- 3. Añadir Alices más cercanas (hasta el límite)
+	for i = 1, math.min(MAX_VISIBLE_ALICES, #aliceDistances) do
+		newVisible[aliceDistances[i][1]] = true -- Marcar este modelo como visible
+	end
+
+	-- 4. Añadir Teachers más cercanos (hasta el límite)
+	for i = 1, math.min(MAX_VISIBLE_TEACHERS, #teacherDistances) do
+		newVisible[teacherDistances[i][1]] = true -- Marcar este modelo como visible
+	end
+
+	-- 5. Actualizar el estado de TODOS los highlights
+	for model, data in pairs(ActiveHighlights) do
+		-- Solo activar si el modelo está en nuestra lista de "newVisible"
+		if newVisible[model] then
+			data.Highlight.Enabled = true
+			data.Highlight.Adornee = model -- Re-asegurar el Adornee
+		else
+			-- Desactivar si no está en la lista (o estaba fuera de rango)
+			data.Highlight.Enabled = false
+		end
 	end
 end
 
@@ -188,6 +235,9 @@ LocalPlayer.CharacterAdded:Connect(function()
 	performScan()
 end)
 
+-- Almacenar la última posición fuera de la función
+local lastPos = Vector3.zero
+
 -- Actualizar al moverse el jugador
 local function connectHeadPosition()
 	local char = LocalPlayer.Character
@@ -195,7 +245,17 @@ local function connectHeadPosition()
 	local head = getRealHead(char)
 	if not head then return end
 
-	head:GetPropertyChangedSignal("Position"):Connect(updateHighlightDistance)
+	-- Inicializar la posición
+	lastPos = head.Position 
+
+	head:GetPropertyChangedSignal("Position"):Connect(function()
+		local newPos = head.Position
+		-- ⬇️ Comprobar si nos movimos lo suficiente ⬇️
+		if (newPos - lastPos).Magnitude > UPDATE_THRESHOLD then
+			lastPos = newPos
+			updateHighlightDistance() -- Solo actualizar si el movimiento supera el umbral
+		end
+	end)
 end
 
 LocalPlayer.CharacterRemoving:Connect(function()
@@ -215,7 +275,26 @@ for _, folder in pairs(Folders) do
 	end)
 	folder.ChildRemoved:Connect(function(child)
 		disableHighlight(child)
+		-- ⬇️ ¡IMPORTANTE! Limpiar las tablas de caché ⬇️
+		ActiveHighlights[child] = nil
+		HeadCache[child] = nil
 	end)
 end
 
 performScan()
+
+------------------------------------------------------------
+-- ♻️ Limpieza automática por evento (¡COPIADO DEL SCRIPT 1!)
+------------------------------------------------------------
+Workspace.DescendantRemoving:Connect(function(obj)
+	-- Si el objeto que se está eliminando es un modelo que teníamos cacheado
+	if ActiveHighlights[obj] then
+		local data = ActiveHighlights[obj]
+		if data and data.Highlight then
+			data.Highlight:Destroy() -- Destruir el highlight para no dejar basura
+		end
+		-- Limpiar ambas tablas
+		ActiveHighlights[obj] = nil
+		HeadCache[obj] = nil
+	end
+end)
