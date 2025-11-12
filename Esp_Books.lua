@@ -17,7 +17,7 @@ local HIGHLIGHT_OUTLINE_COLOR = Color3.fromRGB(0, 0, 255)
 -- 🧠 Estado
 local highlights = {}
 local highlightsFolder = Workspace:FindFirstChild("BookHighlights_Cache") or Instance.new("Folder")
-highlightsFolder.Name = "BookHighlights_Cache"
+highlightsFolder.Name = "HighligthsBooks_Main"
 highlightsFolder.Parent = Workspace
 
 ------------------------------------------------------
