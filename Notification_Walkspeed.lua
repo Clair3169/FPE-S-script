@@ -1,7 +1,19 @@
 local player = game.Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
+local SoundService = game:GetService("SoundService")
+local warningSound = Instance.new("Sound")
+warningSound.SoundId = "rbxassetid://104980570072214"-- <-- ¡Recuerda cambiar este ID!
+warningSound.Volume = 1
+warningSound.Parent = SoundService
 
 local bindableFunction = Instance.new("BindableFunction")
+
+warningSound:Play()
+
+warningSound.Ended:Connect(function()
+    warningSound:Destroy()
+end)
+
 bindableFunction.OnInvoke = function(buttonClicked)
 	if buttonClicked == "Yes" then
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Walkspeed.lua", true))()
