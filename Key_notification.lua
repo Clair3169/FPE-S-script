@@ -1,4 +1,4 @@
-task.wait(7)
+task.wait(6)
 
 local player = game.Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
@@ -10,7 +10,8 @@ hasThirdPerson.Parent = player
 
 local SoundService = game:GetService("SoundService")
 local warningSound = Instance.new("Sound")
-warningSound.SoundId = "rbxassetid://8382337318" -- <-- ¡Recuerda cambiar este ID!
+warningSound.SoundId = "rbxassetid://8382337318"-- <-- ¡Recuerda cambiar este ID!
+warningSound.Volume = 1
 warningSound.Parent = SoundService
 
 local bindableFunction = Instance.new("BindableFunction")
