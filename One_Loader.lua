@@ -17,7 +17,8 @@ local urls = {
   "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Time.lua",
   "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Visual_Enraged.lua",
   "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Welcome_Script.lua",
-  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Esp_Books.lua"
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Esp_Books.lua",
+  "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Camera.lua"
 }
 
 -- NOMBRE DE LA MARCA PARA RECORDAR QUE YA SE EJECUTÓ
