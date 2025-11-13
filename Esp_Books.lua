@@ -41,20 +41,36 @@ local function removeHighlight(meshPart)
 end
 
 local function createHighlight(meshPart)
-	if asleep or not meshPart:IsA("BasePart") or highlights[meshPart] then return end
+	if asleep or not meshPart:IsA("BasePart") then return end
 
+	-- Elimina highlight duplicado o roto
+	if highlights[meshPart] then
+		if highlights[meshPart].Parent then
+			highlights[meshPart]:Destroy()
+		end
+		highlights[meshPart] = nil
+	end
+
+	-- ⚡ Espera a que el objeto esté completamente replicado
+	if not meshPart:IsDescendantOf(Workspace) then
+		task.wait(0.1)
+	end
+
+	-- 🟦 Crear highlight visible inmediatamente
 	local hl = Instance.new("Highlight")
 	hl.Name = "BookHighlight"
 	hl.FillColor = HIGHLIGHT_FILL_COLOR
 	hl.OutlineColor = HIGHLIGHT_OUTLINE_COLOR
-	hl.FillTransparency = 0
-	hl.OutlineTransparency = 0.5
-	hl.Enabled = false
+	hl.FillTransparency = 0 -- 💡 visible pero no sólido
+	hl.OutlineTransparency = 1
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- 👈 fuerza visibilidad
+	hl.Enabled = true
 	hl.Adornee = meshPart
 	hl.Parent = highlightsFolder
 
 	highlights[meshPart] = hl
 end
+
 ------------------------------------------------------
 -- 🧩 Activar/desactivar por distancia
 ------------------------------------------------------
@@ -117,28 +133,56 @@ local function connectBookEvents()
 	-- Ya no llamamos activateBooks aquí. Se hará en initializeBookHighlighter.
 end
 
+------------------------------------------------------
+-- 🧩 Inicialización robusta de los Books (sin duplicar ni perder carga)
+------------------------------------------------------
+local initializing = false
+local initialized = false
+
 local function initializeBookHighlighter()
-	-- 1. Buscamos la carpeta si aún no la tenemos
-	if not booksFolder then
-		booksFolder = Workspace:FindFirstChild("Books")
-	end
+	-- ⛔ Evita múltiples ejecuciones simultáneas
+	if initializing then return end
+	initializing = true
 
-	-- 2. Conectamos los eventos si la encontramos (solo una vez)
-	if booksFolder then
+	task.spawn(function()
+		local tries = 0
+		while not booksFolder or not booksFolder:IsDescendantOf(Workspace) do
+			booksFolder = Workspace:FindFirstChild("Books")
+			if booksFolder then break end
+			tries += 1
+			if tries > 50 then
+				warn("⚠️ No se encontró carpeta 'Books' tras 50 intentos.")
+				initializing = false
+				return
+			end
+			task.wait(0.5)
+		end
+
+		-- 🔹 Esperar a que los libros existan en la carpeta
+		local timeout = os.clock() + 5
+		repeat
+			task.wait(0.25)
+		until (booksFolder and #booksFolder:GetChildren() > 0) or os.clock() > timeout
+
+		-- 🧠 Conectamos eventos solo una vez
 		connectBookEvents()
-	end
 
-	-- 3. Activamos los highlights para los libros que ya existían
-	if booksFolder and not asleep then
+		-- 🟦 Activamos Highlights una sola vez
+		task.wait(0.1)
 		activateBooks()
-	end
-end
 
--- Solo mantenemos la conexión de ChildAdded/Removed del Workspace aquí
+		initialized = true
+		initializing = false
+	end)
+end
+------------------------------------------------------
+-- 🧩 Reintento si los libros se recrean en tiempo real
+------------------------------------------------------
 Workspace.ChildAdded:Connect(function(child)
 	if child.Name == "Books" and child:IsA("Folder") then
 		booksFolder = child
-		connectBookEvents()
+		initialized = false
+		task.defer(initializeBookHighlighter)
 	end
 end)
 
@@ -148,9 +192,9 @@ Workspace.ChildRemoved:Connect(function(child)
 			removeHighlight(meshPart)
 		end
 		booksFolder = nil
+		initialized = false
 	end
 end)
-
 -----------------------------------------------------
 -- 🧩 Estado dormido (Alices / Teachers)
 ------------------------------------------------------
