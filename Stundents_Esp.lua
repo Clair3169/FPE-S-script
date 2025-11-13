@@ -1,4 +1,4 @@
--- 🧿 Student Billboard ESP (Optimizado con Cache y Limpieza)
+-- 🟢 Student Highlighter Optimizado (con limpieza de jugadores desconectados)
 repeat task.wait() until game:IsLoaded()
 
 ------------------------------------------------------------
@@ -22,98 +22,70 @@ local UPDATE_THRESHOLD = 5
 -- 🧠 Estado
 ------------------------------------------------------------
 local systemActive = false
-local activeBillboards = {}
+local activeHighlights = {}
 local visibleStudents = {}
-local cleanupTimer = nil
 
 ------------------------------------------------------------
--- 📦 Cache persistente
+-- 🔧 Cache persistente
 ------------------------------------------------------------
-local billboardCache = Workspace:FindFirstChild("BillboardCache_Students") or Instance.new("Folder")
-billboardCache.Name = "BillboardCache_Students"
-billboardCache.Parent = Workspace
+local highlightCache = Workspace:FindFirstChild("HighlightStudents_Main") or Instance.new("Folder")
+highlightCache.Name = "HighlightStudents_Main"
+highlightCache.Parent = Workspace
 
 ------------------------------------------------------------
--- 🔧 Utilidades
+-- 🔍 Utilidades
 ------------------------------------------------------------
 local function getModelPosition(model)
 	if not model or not model:IsA("Model") then return nil end
 	if model.PrimaryPart then
 		return model.PrimaryPart.Position
 	end
-	local head = model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
-	return head and head.Position
-end
-
-local function ensureAdornee(character, billboard)
-	if not character or not billboard then return end
-	local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
-	if head and billboard.Adornee ~= head then
-		billboard.Adornee = head
+	for _, part in ipairs(model:GetChildren()) do
+		if part:IsA("BasePart") then
+			return part.Position
+		end
 	end
+	return nil
 end
 
-local function getOrCreateBillboard(character)
+local function getOrCreateHighlight(character)
 	if not character or not character:IsA("Model") or not systemActive then return end
 
-	if activeBillboards[character] then
-		return activeBillboards[character]
+	if activeHighlights[character] then
+		return activeHighlights[character]
 	end
 
-	local cacheName = character.Name .. "_BB_Student"
-	local cached = billboardCache:FindFirstChild(cacheName)
-	if cached and cached:IsA("BillboardGui") then
-		ensureAdornee(character, cached)
+	local cacheName = character.Name .. "_HL_Student"
+	local cached = highlightCache:FindFirstChild(cacheName)
+	if cached and cached:IsA("Highlight") then
+		cached.Adornee = character
 		cached.Enabled = false
-		activeBillboards[character] = cached
+		activeHighlights[character] = cached
 		return cached
 	end
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = cacheName
-	billboard.Size = UDim2.new(0, 45, 0, 45)
-	billboard.StudsOffset = Vector3.new(0, 3, 0)
-	billboard.AlwaysOnTop = true
-	billboard.LightInfluence = 0
-	billboard.Enabled = false
-	billboard.MaxDistance = MAX_DISTANCE
-	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
-	billboard.Parent = billboardCache
+	local highlight = Instance.new("Highlight")
+	highlight.Name = cacheName
+	highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+	highlight.FillTransparency = 0.85
+	highlight.OutlineTransparency = 0
+	highlight.Enabled = false
+	highlight.Adornee = character
+	highlight.Parent = highlightCache
 
-	local image = Instance.new("ImageLabel")
-	image.BackgroundTransparency = 1
-	image.Size = UDim2.new(1, 0, 1, 0)
-	image.Image = "rbxassetid://126500139798475" -- ID de la imagen del estudiante
-	image.ScaleType = Enum.ScaleType.Fit
-	image.Parent = billboard
-
-	activeBillboards[character] = billboard
-	return billboard
+	activeHighlights[character] = highlight
+	return highlight
 end
 
-local function updateBillboardState(character, state)
-	local billboard = activeBillboards[character]
-	if not billboard and state then
-		billboard = getOrCreateBillboard(character)
+local function updateHighlightState(character, state)
+	local highlight = activeHighlights[character]
+	if not highlight and state then
+		highlight = getOrCreateHighlight(character)
 	end
-	if billboard then
-		ensureAdornee(character, billboard)
-		billboard.Enabled = state
+	if highlight then
+		highlight.Enabled = state
+		highlight.Adornee = character
 	end
-end
-
-------------------------------------------------------------
--- 🔍 Control de carpeta del jugador local
-------------------------------------------------------------
-local function isInValidFolder()
-	local char = localPlayer.Character
-	if not char or not char.Parent then return false end
-	for _, folderName in ipairs(VALID_FOLDERS) do
-		if char.Parent.Name == folderName then
-			return true
-		end
-	end
-	return false
 end
 
 ------------------------------------------------------------
@@ -121,15 +93,16 @@ end
 ------------------------------------------------------------
 local function updateVisibleStudents()
 	if not systemActive or not localPlayer.Character then return end
+
 	local localPos = getModelPosition(localPlayer.Character)
 	if not localPos then return end
 
 	local distances = {}
 	for _, student in ipairs(studentsFolder:GetChildren()) do
-		if student:IsA("Model") and student ~= localPlayer.Character then
-			local pos = getModelPosition(student)
-			if pos then
-				local dist = (localPos - pos).Magnitude
+		if student ~= localPlayer.Character and student:IsA("Model") then
+			local targetPos = getModelPosition(student)
+			if targetPos then
+				local dist = (localPos - targetPos).Magnitude
 				if dist <= MAX_DISTANCE then
 					table.insert(distances, {student, dist})
 				end
@@ -146,13 +119,13 @@ local function updateVisibleStudents()
 
 	for student in pairs(visibleStudents) do
 		if not newVisible[student] then
-			updateBillboardState(student, false)
+			updateHighlightState(student, false)
 		end
 	end
 
 	for student in pairs(newVisible) do
 		if not visibleStudents[student] then
-			updateBillboardState(student, true)
+			updateHighlightState(student, true)
 		end
 	end
 
@@ -160,32 +133,40 @@ local function updateVisibleStudents()
 end
 
 ------------------------------------------------------------
--- 🧹 Limpieza programada (cuando se desactiva el sistema)
+-- 🔒 Estado del sistema
 ------------------------------------------------------------
-local function scheduleBillboardCleanup()
+local function isInValidFolder()
+	local char = localPlayer.Character
+	if not char or not char.Parent then return false end
+	for _, folderName in ipairs(VALID_FOLDERS) do
+		if char.Parent.Name == folderName then
+			return true
+		end
+	end
+	return false
+end
+
+local cleanupTimer = nil
+local function scheduleHighlightCleanup()
 	if cleanupTimer then return end
 	cleanupTimer = task.delay(50, function()
 		if systemActive then cleanupTimer = nil return end
 
-		for student, bb in pairs(activeBillboards) do
-			if bb then bb:Destroy() end
+		for student, hl in pairs(activeHighlights) do
+			if hl then hl:Destroy() end
 		end
-		activeBillboards = {}
+		activeHighlights = {}
 		visibleStudents = {}
 
-		for _, obj in ipairs(billboardCache:GetChildren()) do
-			if obj:IsA("BillboardGui") then
+		for _, obj in ipairs(highlightCache:GetChildren()) do
+			if obj:IsA("Highlight") then
 				obj:Destroy()
 			end
 		end
-
 		cleanupTimer = nil
 	end)
 end
 
-------------------------------------------------------------
--- 🔒 Sistema principal
-------------------------------------------------------------
 local function updateSystemStatus(force)
 	local shouldBeActive = isInValidFolder()
 	if shouldBeActive == systemActive and not force then return end
@@ -194,56 +175,56 @@ local function updateSystemStatus(force)
 	if systemActive then
 		updateVisibleStudents()
 	else
-		for _, bb in pairs(activeBillboards) do
-			if bb then
-				bb.Enabled = false
-				bb.Adornee = nil
+		for _, hl in pairs(activeHighlights) do
+			if hl then
+				hl.Enabled = false
+				hl.Adornee = nil
 			end
 		end
-		scheduleBillboardCleanup()
+		scheduleHighlightCleanup()
 	end
 end
 
 ------------------------------------------------------------
--- 🧍‍♂️ Eventos Students
+-- 🧍‍♂️ Eventos de Students
 ------------------------------------------------------------
 studentsFolder.ChildAdded:Connect(function(child)
 	if not systemActive then return end
 	if child:IsA("Model") and child ~= localPlayer.Character then
-		getOrCreateBillboard(child)
+		getOrCreateHighlight(child)
 		task.defer(updateVisibleStudents)
 	end
 end)
 
 studentsFolder.ChildRemoved:Connect(function(child)
-	local bb = activeBillboards[child]
-	if bb then
-		bb.Enabled = false
-		bb.Adornee = nil
+	local hl = activeHighlights[child]
+	if hl then
+		hl.Enabled = false
+		hl.Adornee = nil
 	end
-	activeBillboards[child] = nil
+	activeHighlights[child] = nil
 	visibleStudents[child] = nil
 
-	local cached = billboardCache:FindFirstChild(child.Name .. "_BB_Student")
-	if cached and cached:IsA("BillboardGui") then
+	-- 🔥 Limpieza directa del highlight en cache si existe
+	local cached = highlightCache:FindFirstChild(child.Name .. "_HL_Student")
+	if cached and cached:IsA("Highlight") then
 		cached:Destroy()
 	end
 end)
 
-------------------------------------------------------------
--- 🧹 Limpieza si un jugador abandona
-------------------------------------------------------------
+-- 🧹 Limpieza segura cuando un jugador abandona el juego
 Players.PlayerRemoving:Connect(function(player)
-	for student, bb in pairs(activeBillboards) do
+	for student, hl in pairs(activeHighlights) do
 		if student.Name == player.Name then
-			if bb then bb:Destroy() end
-			activeBillboards[student] = nil
+			if hl then hl:Destroy() end
+			activeHighlights[student] = nil
 			visibleStudents[student] = nil
 		end
 	end
 
-	for _, obj in ipairs(billboardCache:GetChildren()) do
-		if obj:IsA("BillboardGui") and obj.Name:find(player.Name .. "_BB_Student") then
+	-- 🔥 Eliminar cualquier highlight residual en cache
+	for _, obj in ipairs(highlightCache:GetChildren()) do
+		if obj:IsA("Highlight") and obj.Name:find(player.Name .. "_HL_Student") then
 			obj:Destroy()
 		end
 	end
@@ -253,10 +234,10 @@ end)
 -- 👤 Personaje local
 ------------------------------------------------------------
 local function onCharacterAdded(character)
-	for _, bb in pairs(activeBillboards) do
-		if bb then bb.Enabled = false bb.Adornee = nil end
+	for _, hl in pairs(activeHighlights) do
+		if hl then hl.Enabled = false hl.Adornee = nil end
 	end
-	activeBillboards = {}
+	activeHighlights = {}
 	visibleStudents = {}
 
 	updateSystemStatus(true)
@@ -288,8 +269,8 @@ localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
 localPlayer.CharacterRemoving:Connect(function()
 	systemActive = false
-	for _, bb in pairs(activeBillboards) do
-		if bb then bb.Enabled = false end
+	for _, hl in pairs(activeHighlights) do
+		if hl then hl.Enabled = false end
 	end
 end)
 
@@ -297,19 +278,19 @@ end)
 -- ♻️ Limpieza global
 ------------------------------------------------------------
 Workspace.DescendantRemoving:Connect(function(obj)
-	if activeBillboards[obj] then
-		local bb = activeBillboards[obj]
-		if bb then
-			bb.Enabled = false
-			bb.Adornee = nil
+	if activeHighlights[obj] then
+		local hl = activeHighlights[obj]
+		if hl then
+			hl.Enabled = false
+			hl.Adornee = nil
 		end
-		activeBillboards[obj] = nil
+		activeHighlights[obj] = nil
 		visibleStudents[obj] = nil
 	end
 end)
 
 ------------------------------------------------------------
--- 🔁 Auto-verificador (detecta billboards huérfanos)
+-- 🔁 Auto-verificador (mejorado: elimina highlights huérfanos)
 ------------------------------------------------------------
 task.spawn(function()
 	while task.wait(5) do
@@ -317,18 +298,18 @@ task.spawn(function()
 		local missing = false
 		for _, student in ipairs(studentsFolder:GetChildren()) do
 			if student:IsA("Model") and student ~= localPlayer.Character then
-				if not activeBillboards[student] then
+				if not activeHighlights[student] then
 					missing = true
 					break
 				end
 			end
 		end
 
-		-- 🔥 Limpieza de billboards huérfanos
-		for student, bb in pairs(activeBillboards) do
+		-- 🔥 Limpieza de highlights huérfanos (jugadores que ya no existen)
+		for student, hl in pairs(activeHighlights) do
 			if not student or not student.Parent then
-				if bb then bb:Destroy() end
-				activeBillboards[student] = nil
+				if hl then hl:Destroy() end
+				activeHighlights[student] = nil
 				visibleStudents[student] = nil
 			end
 		end
@@ -337,17 +318,4 @@ task.spawn(function()
 			updateVisibleStudents()
 		end
 	end
-end)
-
-------------------------------------------------------------
--- 🚀 Inicialización
-------------------------------------------------------------
-for _, student in ipairs(studentsFolder:GetChildren()) do
-	if student:IsA("Model") and student ~= localPlayer.Character then
-		getOrCreateBillboard(student)
-	end
-end
-
-task.defer(function()
-	updateSystemStatus(true)
 end)
