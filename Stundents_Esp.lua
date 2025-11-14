@@ -20,7 +20,7 @@ local MAX_DISTANCE = 200
 local UPDATE_THRESHOLD = 5
 
 -- POOL
-local POOL_SIZE = 25 -- <-- pedido por ti
+local POOL_SIZE = 25 -- configurado por ti
 
 ------------------------------------------------------------
 -- 🧠 Estado
@@ -43,10 +43,12 @@ end
 -- 🔁 POOL DE HIGHLIGHTS (centralizado)
 ------------------------------------------------------------
 local highlightPool = {}
+local poolNextId = 1
+local creatingPool = true
 
 local function createPoolHighlight(idx)
 	local hl = Instance.new("Highlight")
-	hl.Name = ("Pooled_HL_%d"):format(idx)
+	hl.Name = ("Pooled_HL_%s"):format(tostring(idx))
 	hl.Enabled = false
 	-- Mantener estilo similar a tu original
 	hl.OutlineColor = Color3.fromRGB(0, 255, 0)
@@ -56,35 +58,74 @@ local function createPoolHighlight(idx)
 	return hl
 end
 
--- Prellenar el pool
-for i = 1, POOL_SIZE do
-	table.insert(highlightPool, createPoolHighlight(i))
-	task.wait(1)
-end
-
+-- obtiene un highlight del pool o crea emergencia si está vacío
 local function getHighlightFromPool()
-	-- Reutiliza si hay disponibles, sino crear uno nuevo y añadir al cache
 	if #highlightPool > 0 then
 		local hl = table.remove(highlightPool)
-		-- Asegurarse de que esté limpio
 		hl.Enabled = false
 		hl.Adornee = nil
 		return hl
 	end
-
-	-- si se agotó el pool, crear uno extra (crecimiento dinámico)
-	local hl = createPoolHighlight(POOL_SIZE + 1)
-	POOL_SIZE = POOL_SIZE + 1
+	-- fallback: crear uno extra dinámicamente
+	local hl = createPoolHighlight(("extra_%d"):format(poolNextId))
+	poolNextId = poolNextId + 1
 	return hl
 end
 
+-- devolver al pool (limpiando)
 local function releaseHighlightToPool(hl)
 	if not hl then return end
 	hl.Enabled = false
 	hl.Adornee = nil
-	-- devolver al pool
 	table.insert(highlightPool, hl)
 end
+
+-- asigna highlight ya existente al modelo (sin crear uno nuevo aquí)
+local function assignHighlightToModel(model, hl)
+	if not model or not model:IsA("Model") or not hl then return end
+	hl.Adornee = model
+	-- no activar aquí si no corresponde; la activación la decide updateVisibleStudents/ updateHighlightState
+	activeHighlights[model] = hl
+end
+
+-- helper: buscar primer estudiante visible que NO tenga highlight
+local function findVisibleWithoutHighlight()
+	for student in pairs(visibleStudents) do
+		if not activeHighlights[student] then
+			return student
+		end
+	end
+	return nil
+end
+
+-- Prellenado progresivo: crear uno cada 0.5s y asignar inmediatamente si hay necesidad
+task.spawn(function()
+	while poolNextId <= POOL_SIZE do
+		local hl = createPoolHighlight(poolNextId)
+		poolNextId = poolNextId + 1
+		-- añadir al pool
+		table.insert(highlightPool, hl)
+
+		-- Mientras haya highlights en pool y estudiantes visibles sin highlight, asignarlos
+		while #highlightPool > 0 do
+			local studentNoHl = findVisibleWithoutHighlight()
+			if not studentNoHl then break end
+			-- obtener del pool y asignar
+			local taken = table.remove(highlightPool)
+			if taken then
+				assignHighlightToModel(studentNoHl, taken)
+				-- activar inmediatamente porque está visible
+				taken.Enabled = true
+				taken.Adornee = studentNoHl
+				visibleStudents[studentNoHl] = true
+			end
+		end
+
+		task.wait(0.3) -- ajustar a 1.0 si quieres más lento
+	end
+
+	creatingPool = false
+end)
 
 ------------------------------------------------------------
 -- 🔍 Utilidades
@@ -116,17 +157,13 @@ end
 ------------------------------------------------------------
 -- 🔧 Funciones para asignar / liberar highlights (usando pool)
 ------------------------------------------------------------
-local function assignHighlightToModel(model)
-	if not model or not model:IsA("Model") or not systemActive then return end
-	-- si ya tiene highlight asignado, devolverlo
-	if activeHighlights[model] then
-		return activeHighlights[model]
-	end
+local function assignHighlightIfMissing(model)
+	if not model or not model:IsA("Model") then return end
+	if activeHighlights[model] then return activeHighlights[model] end
 
+	-- intentar tomar del pool (fallback creará si está vacío)
 	local hl = getHighlightFromPool()
-	hl.Adornee = model
-	hl.Enabled = false -- se activará según visibilidad
-	activeHighlights[model] = hl
+	assignHighlightToModel(model, hl)
 	return hl
 end
 
@@ -143,7 +180,7 @@ local function updateHighlightState(model, state)
 	if not model then return end
 	local hl = activeHighlights[model]
 	if not hl and state then
-		hl = assignHighlightToModel(model)
+		hl = assignHighlightIfMissing(model)
 	end
 	if hl then
 		hl.Enabled = state
@@ -195,7 +232,7 @@ local function updateVisibleStudents(force)
 	for student in pairs(newVisible) do
 		if force or not visibleStudents[student] then
 			-- asigna highlight si hace falta y activa
-			local hl = activeHighlights[student] or assignHighlightToModel(student)
+			local hl = activeHighlights[student] or assignHighlightIfMissing(student)
 			if hl then
 				hl.Adornee = student
 				hl.Enabled = true
@@ -229,8 +266,7 @@ local function scheduleHighlightCleanup()
 		activeHighlights = {}
 		visibleStudents = {}
 
-		-- (opcional) mantener los objetos en highlightCache para pool,
-		-- no los destruimos porque estamos usando pool centralizado
+		-- no destruimos objetos del highlightCache; quedan para el pool
 		cleanupTimer = nil
 	end)
 end
@@ -264,8 +300,8 @@ studentsFolder.ChildAdded:Connect(function(child)
 	-- si el sistema no está activo, no hacemos nada
 	if not systemActive then return end
 	if child:IsA("Model") and child ~= localPlayer.Character then
-		-- asigna (o reutiliza) un highlight para este modelo
-		assignHighlightToModel(child)
+		-- asigna (o reutiliza) un highlight para este modelo (preparación)
+		assignHighlightIfMissing(child)
 
 		-- activación inmediata si ya está en rango (capa de seguridad)
 		local localPos = getModelPosition(localPlayer.Character)
@@ -312,9 +348,6 @@ Players.PlayerRemoving:Connect(function(player)
 			visibleStudents[model] = nil
 		end
 	end
-
-	-- no destruimos highlights del pool; si existieran highlights nombrados en highlightCache,
-	-- los dejamos para reutilizar (no eliminar)
 end)
 
 ------------------------------------------------------------
