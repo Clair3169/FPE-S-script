@@ -1,334 +1,314 @@
--- 🟦 Book Highlighter Robusto (visible si el script corre tarde)
+-- 🟦 BOOK ESP (versión optimizada estilo B, robusta y limpia)
 repeat task.wait() until game:IsLoaded()
 
+---------------------------------------------------------------------
+-- ⚙️ Servicios
+---------------------------------------------------------------------
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
-local player = Players.LocalPlayer
-if not player then return end
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then return end
 
--- Configuración
-local RENDER_DISTANCE = 150
-local HIGHLIGHT_FILL_COLOR = Color3.fromRGB(135, 206, 250)
-local HIGHLIGHT_OUTLINE_COLOR = Color3.fromRGB(0, 0, 255)
+---------------------------------------------------------------------
+-- ⚙️ Configuración
+---------------------------------------------------------------------
+local MAX_DISTANCE = 150
+local COLOR_FILL   = Color3.fromRGB(135, 206, 250)
+local COLOR_OUT    = Color3.fromRGB(0, 0, 255)
 
--- Estado
-local highlights = {} -- [BasePart] = Highlight
-local highlightsFolder = Workspace:FindFirstChild("HighligthsBooks_Main") or Instance.new("Folder")
-highlightsFolder.Name = "HighligthsBooks_Main"
-highlightsFolder.Parent = Workspace
-
-local booksFolder = Workspace:FindFirstChild("Books")
+---------------------------------------------------------------------
+-- 🧠 Estado interno
+---------------------------------------------------------------------
+local BooksFolder = Workspace:FindFirstChild("Books")
 local asleep = false
 
--- Utilidad: devuelve la parte válida a la que se adornea (si se pasa un Model, intenta PrimaryPart o la primera BasePart)
-local function getTargetPartFromInstance(inst)
-	if not inst then return nil end
-	if inst:IsA("BasePart") then
-		return inst
-	elseif inst:IsA("Model") then
-		if inst.PrimaryPart and inst.PrimaryPart:IsA("BasePart") then
-			return inst.PrimaryPart
-		end
-		-- buscar la primera BasePart descendiente
-		for _, d in ipairs(inst:GetDescendants()) do
-			if d:IsA("BasePart") then
-				return d
-			end
-		end
-	end
-	return nil
-end
+local HighlightFolder = Workspace:FindFirstChild("HighlightBooks_Main") or Instance.new("Folder")
+HighlightFolder.Name = "HighlightBooks_Main"
+HighlightFolder.Parent = Workspace
 
--- Posición local segura (espera HumanoidRootPart si necesario)
+local Active = {} -- part → highlight
+
+---------------------------------------------------------------------
+-- 🔍 Utilidades
+---------------------------------------------------------------------
 local function getLocalPos()
-	local char = player.Character
+	local char = LocalPlayer.Character
 	if not char then return nil end
 	local root = char:FindFirstChild("HumanoidRootPart")
 	return root and root.Position or nil
 end
 
--- Remove
-local function removeHighlight(meshPart)
-	if not meshPart then return end
-	local hl = highlights[meshPart]
-	if hl then
-		if hl.Parent then hl:Destroy() end
-		highlights[meshPart] = nil
-	end
-end
+local function getTargetPart(obj)
+	if not obj then return nil end
 
--- Create single highlight for a target BasePart
-local function createHighlightForPart(part)
-	if not part or not part:IsA("BasePart") then return end
-	if asleep then return end
-
-	-- Evitar duplicados si ya existe
-	local existing = highlights[part]
-	if existing and existing.Parent then
-		return
-	elseif existing then
-		existing:Destroy()
-		highlights[part] = nil
-	end
-
-	-- Asegurar que la parte esté en el Workspace (replicada)
-	if not part:IsDescendantOf(Workspace) then
-		task.wait(0.05)
-		if not part:IsDescendantOf(Workspace) then
-			-- si aún no está, abortamos de forma segura
-			return
+	if obj:IsA("BasePart") then
+		return obj
+	elseif obj:IsA("Model") then
+		if obj.PrimaryPart and obj.PrimaryPart:IsA("BasePart") then
+			return obj.PrimaryPart
+		end
+		for _, d in ipairs(obj:GetDescendants()) do
+			if d:IsA("BasePart") then
+				return d
+			end
 		end
 	end
 
+	return nil
+end
+
+---------------------------------------------------------------------
+-- ✏️ Crear Highlight
+---------------------------------------------------------------------
+local function createHL(part)
+	if not part or not part:IsA("BasePart") then return end
+	if asleep then return end
+
+	-- evitar duplicados
+	if Active[part] then
+		if Active[part].Parent then return end
+		Active[part]:Destroy()
+		Active[part] = nil
+	end
+
+	-- asegurarse que esté replicado
+	if not part:IsDescendantOf(Workspace) then
+		task.wait(0.05)
+		if not part:IsDescendantOf(Workspace) then return end
+	end
+
 	local hl = Instance.new("Highlight")
-	hl.Name = "BookHighlight"
-	hl.FillColor = HIGHLIGHT_FILL_COLOR
-	hl.OutlineColor = HIGHLIGHT_OUTLINE_COLOR
+	hl.Name = "BookHL"
+	hl.FillColor = COLOR_FILL
+	hl.OutlineColor = COLOR_OUT
 	hl.FillTransparency = 0
 	hl.OutlineTransparency = 1
 	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	hl.Adornee = part
-	hl.Parent = highlightsFolder
-
-	-- NO establecemos Enabled aquí a true incondicionalmente; lo dejamos en nil/false y lo controlamos por distancia
 	hl.Enabled = false
+	hl.Parent = HighlightFolder
 
-	highlights[part] = hl
+	Active[part] = hl
 end
 
--- Crear highlight dado un objeto de Books (puede ser BasePart o Model)
-local function createHighlightForBookObject(bookObj)
-	if not bookObj then return end
-	local target = getTargetPartFromInstance(bookObj)
-	if target then
-		createHighlightForPart(target)
+---------------------------------------------------------------------
+-- ❌ Remover Highlight
+---------------------------------------------------------------------
+local function removeHL(part)
+	local hl = Active[part]
+	if hl then
+		hl:Destroy()
 	end
+	Active[part] = nil
 end
 
--- Actualiza visibilidad según distancia; forceUpdate obliga recalculo incluso si Estado coincide
-local function updateHighlightsInRange(forceUpdate)
-	local localPos = getLocalPos()
-	if not localPos or asleep then
-		-- Si estamos dormidos, aseguramos apagar todo
-		for part, hl in pairs(highlights) do
-			if hl and hl.Enabled then
-				hl.Enabled = false
-			end
+---------------------------------------------------------------------
+-- 🌓 Actualizar distancia
+---------------------------------------------------------------------
+local function updateRange(force)
+	local pos = getLocalPos()
+	if not pos or asleep then
+		for part, hl in pairs(Active) do
+			if hl.Enabled then hl.Enabled = false end
 		end
 		return
 	end
 
-	for part, hl in pairs(highlights) do
+	for part, hl in pairs(Active) do
 		if not part or not part.Parent then
-			removeHighlight(part)
+			removeHL(part)
 		else
-			local dist = (part.Position - localPos).Magnitude
-			local shouldBeVisible = dist <= RENDER_DISTANCE
-			-- Si no hay highlight (por alguna razón), lo recreamos
-			if (not hl or not hl.Parent) then
-				highlights[part] = nil
-				createHighlightForPart(part)
-				hl = highlights[part]
+			if not hl or not hl.Parent then
+				removeHL(part)
+				createHL(part)
+				hl = Active[part]
 			end
-			if hl then
-				if forceUpdate or hl.Enabled ~= shouldBeVisible then
-					hl.Enabled = shouldBeVisible
-				end
+
+			local dist = (part.Position - pos).Magnitude
+			local visible = dist <= MAX_DISTANCE
+
+			if force or hl.Enabled ~= visible then
+				hl.Enabled = visible
 			end
 		end
 	end
 end
 
--- Recorrer la carpeta Books (y sus hijos) y crear highlights
-local function scanAndActivateExistingBooks()
-	if not booksFolder then return end
-	for _, child in ipairs(booksFolder:GetChildren()) do
-		-- si es modelo o basepart -- soporta estructuras donde book es un Model
-		createHighlightForBookObject(child)
-		-- Si el child es Model, también conectar DescendantAdded para detectar partes agregadas luego
+---------------------------------------------------------------------
+-- 📚 Escaneo inicial
+---------------------------------------------------------------------
+local function scanBooks()
+	if not BooksFolder then return end
+
+	for _, child in ipairs(BooksFolder:GetChildren()) do
+		local part = getTargetPart(child)
+		if part then createHL(part) end
+
+		-- si es modelo, escuchar partes internas
 		if child:IsA("Model") then
-			child.DescendantAdded:Connect(function(desc)
-				-- si añade una BasePart dentro del modelo, y no tenemos highlight, crearla
-				if desc:IsA("BasePart") then
-					-- Si el model tiene PrimaryPart, preferimos esa; pero si no, aceptamos esta parte
-					local primary = getTargetPartFromInstance(child)
-					if primary and not highlights[primary] then
-						createHighlightForPart(primary)
-					end
-				end
-			end)
-		end
-	end
-	-- Forzamos actualización inmediata de visibilidad (por si el jugador está cerca ahora)
-	updateHighlightsInRange(true)
-end
-
--- Connect events for Books folder (only once)
-local function connectBookEvents()
-	if not booksFolder then return end
-	if booksFolder:GetAttribute("EventsConnected") then return end
-	booksFolder:SetAttribute("EventsConnected", true)
-
-	-- Si se añade un child nuevo (BasePart o Model), crear highlight inmediato
-	booksFolder.ChildAdded:Connect(function(child)
-		if asleep then return end
-		createHighlightForBookObject(child)
-
-		-- Si es Model, conectar DescendantAdded para detectar partes internas
-		if child:IsA("Model") then
-			child.DescendantAdded:Connect(function(desc)
+			child.DescendantAdded:Connect(function(d)
 				if asleep then return end
-				if desc:IsA("BasePart") then
-					local primary = getTargetPartFromInstance(child)
-					if primary and not highlights[primary] then
-						createHighlightForPart(primary)
+				if d:IsA("BasePart") then
+					local primary = getTargetPart(child)
+					if primary and not Active[primary] then
+						createHL(primary)
 					end
 				end
 			end)
 		end
+	end
 
-		-- Forzamos sync de visibilidad (útil cuando el script corre tarde)
-		updateHighlightsInRange(true)
+	updateRange(true)
+end
+
+---------------------------------------------------------------------
+-- 🔌 Eventos de Books
+---------------------------------------------------------------------
+local function hookBooks()
+	if not BooksFolder or BooksFolder:GetAttribute("Hooked") then return end
+	BooksFolder:SetAttribute("Hooked", true)
+
+	BooksFolder.ChildAdded:Connect(function(child)
+		if asleep then return end
+		local part = getTargetPart(child)
+		if part then createHL(part) end
+		updateRange(true)
+
+		if child:IsA("Model") then
+			child.DescendantAdded:Connect(function(d)
+				if asleep then return end
+				if d:IsA("BasePart") then
+					local p = getTargetPart(child)
+					if p and not Active[p] then createHL(p) end
+				end
+			end)
+		end
 	end)
 
-	booksFolder.ChildRemoved:Connect(function(child)
-		-- al eliminar un book (modelo o parte), buscamos su target y lo removemos
-		local target = getTargetPartFromInstance(child)
-		if target then
-			removeHighlight(target)
-		end
+	BooksFolder.ChildRemoved:Connect(function(child)
+		local p = getTargetPart(child)
+		if p then removeHL(p) end
 	end)
 end
 
--- Inicialización robusta: esperar Character+Root, Books folder y luego escanear + conectar
-local function initialize()
-	-- 1) Esperar Character y HumanoidRootPart
-	local char = player.Character
-	if not char then
-		char = player.CharacterAdded:Wait()
-	end
-	local root = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 10)
+---------------------------------------------------------------------
+-- 😴 Detección de Sleep (Alices / Teachers)
+---------------------------------------------------------------------
+local function checkSleep()
+	local char = LocalPlayer.Character
+	if not char then return end
 
-	-- 2) Asegurar carpeta Books (puede existir ya)
-	booksFolder = booksFolder or Workspace:FindFirstChild("Books")
-	if not booksFolder then
-		-- esperar un corto tiempo si no existe aun
-		local tries = 0
-		while not booksFolder and tries < 40 do
-			booksFolder = Workspace:FindFirstChild("Books")
-			if booksFolder then break end
-			tries = tries + 1
+	local parent = char.Parent
+	local new = parent and (parent.Name == "Alices" or parent.Name == "Teachers")
+
+	if new ~= asleep then
+		asleep = new
+		if asleep then
+			for _, hl in pairs(Active) do
+				hl.Enabled = false
+			end
+		else
+			if BooksFolder then scanBooks() end
+			updateRange(true)
+		end
+	end
+end
+
+---------------------------------------------------------------------
+-- 🛠 Inicialización
+---------------------------------------------------------------------
+local function init()
+	-- esperar root
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local root = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart")
+
+	-- asegurar carpeta Books
+	if not BooksFolder then
+		for i = 1, 40 do
+			BooksFolder = Workspace:FindFirstChild("Books")
+			if BooksFolder then break end
 			task.wait(0.1)
 		end
 	end
 
-	-- 3) Conectar y escanear si existe
-	if booksFolder then
-		connectBookEvents()
-		-- ESCANEAR y crear highlights para TODOS los libros existentes (funciona si script corre tarde)
-		scanAndActivateExistingBooks()
+	if BooksFolder then
+		hookBooks()
+		scanBooks()
 	end
 
-	-- 4) Hook de movimiento: actualizar cuando te mueves lo suficiente
-	local lastPos = root.Position
+	local last = root.Position
 	root:GetPropertyChangedSignal("Position"):Connect(function()
 		if asleep then return end
-		local newPos = root.Position
-		-- umbral para evitar demasiadas actualizaciones (ajusta si quieres)
-		if (newPos - lastPos).Magnitude > 4 then
-			lastPos = newPos
-			updateHighlightsInRange()
+		local new = root.Position
+		if (new - last).Magnitude > 4 then
+			last = new
+			updateRange()
 		end
 	end)
 end
 
--- Check sleep state (Alices / Teachers)
-local function checkSleepState()
-	local char = player.Character
-	if not char then return end
-	local parent = char.Parent
-	local newAsleep = parent and (parent.Name == "Alices" or parent.Name == "Teachers")
-
-	if newAsleep ~= asleep then
-		asleep = newAsleep
-		if asleep then
-			-- apagar todos
-			for part, hl in pairs(highlights) do
-				if hl and hl.Enabled then
-					hl.Enabled = false
-				end
-			end
-		else
-			-- al despertar, forzamos rescan y update inmediato
-			booksFolder = booksFolder or Workspace:FindFirstChild("Books")
-			if booksFolder then
-				scanAndActivateExistingBooks()
-			end
-			updateHighlightsInRange(true)
-		end
-	end
-end
-
--- Listeners para Workspace (libros recreados)
-Workspace.ChildAdded:Connect(function(child)
-	if child.Name == "Books" and child:IsA("Folder") then
-		booksFolder = child
-		-- permitimos reconnect
-		if booksFolder then
-			connectBookEvents()
-			scanAndActivateExistingBooks()
-		end
+---------------------------------------------------------------------
+-- 🌍 Detectar recreación de Books
+---------------------------------------------------------------------
+Workspace.ChildAdded:Connect(function(c)
+	if c.Name == "Books" and c:IsA("Folder") then
+		BooksFolder = c
+		hookBooks()
+		scanBooks()
 	end
 end)
 
-Workspace.ChildRemoved:Connect(function(child)
-	if child == booksFolder then
-		for p in pairs(highlights) do removeHighlight(p) end
-		booksFolder = nil
+Workspace.ChildRemoved:Connect(function(c)
+	if c == BooksFolder then
+		for part in pairs(Active) do removeHL(part) end
+		BooksFolder = nil
 	end
 end)
 
--- Monitor de CharacterAdded
-player.CharacterAdded:Connect(function(char)
-	char:GetPropertyChangedSignal("Parent"):Connect(checkSleepState)
-	checkSleepState()
-	-- re-inicializar (si el script ya corría)
+---------------------------------------------------------------------
+-- 🧬 Character events
+---------------------------------------------------------------------
+LocalPlayer.CharacterAdded:Connect(function(char)
+	char:GetPropertyChangedSignal("Parent"):Connect(checkSleep)
+	checkSleep()
 	task.defer(function()
-		initialize()
-		updateHighlightsInRange(true)
+		init()
+		updateRange(true)
 	end)
 end)
 
--- Si el Character ya existe al inicio
-if player.Character then
-	player.Character:GetPropertyChangedSignal("Parent"):Connect(checkSleepState)
-	checkSleepState()
+if LocalPlayer.Character then
+	LocalPlayer.Character:GetPropertyChangedSignal("Parent"):Connect(checkSleep)
+	checkSleep()
 	task.defer(function()
-		initialize()
-		updateHighlightsInRange(true)
+		init()
+		updateRange(true)
 	end)
 end
 
--- Auto-verificador periódicamente reconcilia highlights huérfanos y asegura visibilidad
+---------------------------------------------------------------------
+-- 🔧 Auto-Repair
+---------------------------------------------------------------------
 task.spawn(function()
 	while task.wait(3) do
-		-- Si no hay carpeta Books, saltar
-		if not booksFolder then continue end
-		-- Asegurar que cada book tenga su highlight
-		for _, child in ipairs(booksFolder:GetChildren()) do
-			local target = getTargetPartFromInstance(child)
-			if target and not highlights[target] and not asleep then
-				createHighlightForPart(target)
+		if not BooksFolder then continue end
+
+		-- asegurar highlight por cada libro
+		for _, child in ipairs(BooksFolder:GetChildren()) do
+			local part = getTargetPart(child)
+			if part and not Active[part] and not asleep then
+				createHL(part)
 			end
 		end
-		-- Remover highlights sin target
-		for part, hl in pairs(highlights) do
+
+		-- limpiar huérfanos
+		for part in pairs(Active) do
 			if not part or not part.Parent then
-				removeHighlight(part)
+				removeHL(part)
 			end
 		end
-		-- Forzar refresco visual (si el jugador ya tiene root)
-		updateHighlightsInRange(true)
+
+		updateRange(true)
 	end
 end)
