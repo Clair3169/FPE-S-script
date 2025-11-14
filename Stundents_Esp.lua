@@ -58,6 +58,7 @@ local function getOrCreateHighlight(character)
 	local cacheName = character.Name .. "_HL_Student"
 	local cached = highlightCache:FindFirstChild(cacheName)
 	if cached and cached:IsA("Highlight") then
+		-- reasignar adornee y reiniciar estado
 		cached.Adornee = character
 		cached.Enabled = false
 		activeHighlights[character] = cached
@@ -90,8 +91,9 @@ end
 
 ------------------------------------------------------------
 -- 🎯 Actualizar visibles
+-- ahora con parámetro force para forzar activación inmediata
 ------------------------------------------------------------
-local function updateVisibleStudents()
+local function updateVisibleStudents(force)
 	if not systemActive or not localPlayer.Character then return end
 
 	local localPos = getModelPosition(localPlayer.Character)
@@ -117,14 +119,16 @@ local function updateVisibleStudents()
 		newVisible[distances[i][1]] = true
 	end
 
+	-- Desactivar los que ya no están en la nueva lista
 	for student in pairs(visibleStudents) do
 		if not newVisible[student] then
 			updateHighlightState(student, false)
 		end
 	end
 
+	-- Activar los nuevos (o forzar si se pidió)
 	for student in pairs(newVisible) do
-		if not visibleStudents[student] then
+		if force or not visibleStudents[student] then
 			updateHighlightState(student, true)
 		end
 	end
@@ -150,6 +154,7 @@ local cleanupTimer = nil
 local function scheduleHighlightCleanup()
 	if cleanupTimer then return end
 	cleanupTimer = task.delay(50, function()
+		-- si el sistema se activó mientras esperamos, cancelar cleanup
 		if systemActive then cleanupTimer = nil return end
 
 		for student, hl in pairs(activeHighlights) do
@@ -173,7 +178,7 @@ local function updateSystemStatus(force)
 	systemActive = shouldBeActive
 
 	if systemActive then
-		updateVisibleStudents()
+		updateVisibleStudents(force)
 	else
 		for _, hl in pairs(activeHighlights) do
 			if hl then
@@ -191,8 +196,25 @@ end
 studentsFolder.ChildAdded:Connect(function(child)
 	if not systemActive then return end
 	if child:IsA("Model") and child ~= localPlayer.Character then
-		getOrCreateHighlight(child)
-		task.defer(updateVisibleStudents)
+		-- crear o reutilizar highlight en cache
+		local highlight = getOrCreateHighlight(child)
+
+		-- 🔥 Capa de seguridad: activar si ya está en rango (inmediato)
+		local localPos = getModelPosition(localPlayer.Character)
+		local studentPos = getModelPosition(child)
+
+		if localPos and studentPos then
+			local dist = (localPos - studentPos).Magnitude
+			if dist <= MAX_DISTANCE then
+				highlight.Enabled = true
+				visibleStudents[child] = true
+			end
+		end
+
+		-- forzar una actualización completa después de añadir
+		task.defer(function()
+			updateVisibleStudents(true)
+		end)
 	end
 end)
 
@@ -241,6 +263,10 @@ local function onCharacterAdded(character)
 	visibleStudents = {}
 
 	updateSystemStatus(true)
+
+	task.defer(function()
+		updateVisibleStudents(true)
+	end)
 
 	task.defer(function()
 		local root = character:WaitForChild("HumanoidRootPart", 3)
@@ -315,7 +341,7 @@ task.spawn(function()
 		end
 
 		if missing then
-			updateVisibleStudents()
+			updateVisibleStudents(true)
 		end
 	end
 end)
