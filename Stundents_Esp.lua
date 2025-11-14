@@ -59,6 +59,7 @@ end
 -- Prellenar el pool
 for i = 1, POOL_SIZE do
 	table.insert(highlightPool, createPoolHighlight(i))
+	task.wait(1)
 end
 
 local function getHighlightFromPool()
