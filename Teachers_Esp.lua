@@ -15,29 +15,23 @@ local Folders = {
 }
 
 ------------------------------------------------------------
--- ⚙️ Configuración (Modificada)
+-- ⚙️ Configuración
 ------------------------------------------------------------
 local MAX_RENDER_DISTANCE = 250
-local UPDATE_THRESHOLD = 5 -- Se mantiene la lógica original
-
--- Intervalo del bucle LIGERO (actualizar colores)
+local UPDATE_THRESHOLD = 5
 local COLOR_UPDATE_INTERVAL = 0.25
 
--- Slots: 1 alice + 3 teachers = 4 total
 local SLOTS_A = 1
 local SLOTS_T = 3
 local TOTAL_SLOTS = SLOTS_A + SLOTS_T
 
--- Crear 1 highlight por segundo
 local CREATION_INTERVAL = 1
 
--- NIVELES DE DISTANCIA
 local DISTANCES = {
 	Close = 30,
 	Medium = 130,
 }
 
--- TABLA DE COLORES
 local COLORS = {
 	Alices_Close = Color3.fromRGB(150, 0, 0),
 	Teachers_Close = Color3.fromRGB(255, 0, 0),
@@ -52,7 +46,7 @@ local HighlightCache = Workspace:FindFirstChild("HighlightTeachers_Main") or Ins
 HighlightCache.Name = "HighlightTeachers_Main"
 HighlightCache.Parent = Workspace
 
-local ActiveHighlights = {} -- model → {Highlight, Folder, Distance, InRange}
+local ActiveHighlights = {}
 local HeadCache = {}
 local freePool = {}
 local createdCount = 0
@@ -182,10 +176,8 @@ local function assignHighlight(hl, model, folder, distance)
 end
 
 ------------------------------------------------------------
--- 📏 Distancias (¡Bucle Ligero!)
+-- 📏 Distancias
 ------------------------------------------------------------
--- ESTA ES LA NUEVA FUNCIÓN LIGERA
--- Solo actualiza distancias y colores de los objetivos YA ACTIVOS
 local function updateActiveColors()
 	local myChar = LocalPlayer.Character
 	local myHead = getRealHead(myChar) or getAnyPart(myChar)
@@ -194,8 +186,6 @@ local function updateActiveColors()
 
 	for model, data in pairs(ActiveHighlights) do
 		if not model:IsDescendantOf(Workspace) then
-			-- El bucle pesado (performScan) se encargará de limpiarlo,
-			-- pero podemos deshabilitarlo por ahora.
 			data.Highlight.Enabled = false
 		else
 			local part = getRealHead(model) or getAnyPart(model)
@@ -204,23 +194,19 @@ local function updateActiveColors()
 				data.InRange = false
 				data.Highlight.Enabled = false
 			else
-				-- Recalcular distancia
 				local d = (part.Position - myPos).Magnitude
 				data.Distance = d
 				
-				-- Actualizar rango
 				if d > MAX_RENDER_DISTANCE then
 					data.InRange = false
 					data.Highlight.Enabled = false
 				else
 					data.InRange = true
-					-- ESTA ES LA CLAVE: Actualizar el color en el bucle rápido
 					local newColor = getColorFromDistance(data.Folder, d)
 					if data.Highlight.OutlineColor ~= newColor then
 						data.Highlight.OutlineColor = newColor
 					end
 					
-					-- Asegurarse de que esté habilitado si está en rango
 					if not data.Highlight.Enabled then
 						data.Highlight.Enabled = true
 					end
@@ -231,7 +217,7 @@ local function updateActiveColors()
 end
 
 ------------------------------------------------------------
--- 🎯 Selección de candidatos (Parte del Bucle Pesado)
+-- 🎯 Selección de candidatos
 ------------------------------------------------------------
 local function buildDesired()
 	local plFolder = detectPlayerFolder()
@@ -278,26 +264,22 @@ local function buildDesired()
 	for i = 1, math.min(#T, SLOTS_T) do
 		desired[T[i].model] = {folder="Teachers", distance=T[i].distance}
 	end
-
+	
 	return desired
 end
 
 ------------------------------------------------------------
--- 🔁 performScan (El Bucle Pesado)
+-- 🔁 performScan
 ------------------------------------------------------------
--- Esta función ahora solo se preocupa de QUIÉN está en los slots,
--- no de actualizar sus colores (eso lo hace el bucle ligero).
 local function performScan()
 	local desired = buildDesired()
 
-	-- Liberar no deseados
 	for model, _ in pairs(ActiveHighlights) do
 		if not desired[model] then
 			destroyHighlightForModel(model)
 		end
 	end
 
-	-- Necesitan highlight
 	local need = {}
 	for model, info in pairs(desired) do
 		if not ActiveHighlights[model] then
@@ -305,21 +287,19 @@ local function performScan()
 		end
 	end
 	
-	if #need == 0 then return end -- No hay nada que asignar
+	if #need == 0 then return end
 
 	table.sort(need, function(a,b) return a.distance < b.distance end)
 
-	-- Reusar highlight
 	for _, entry in ipairs(need) do
 		if #freePool > 0 then
 			local hl = table.remove(freePool)
 			assignHighlight(hl, entry.model, entry.folder, entry.distance)
 		else
-			break -- El creador (lento) se encargará
+			break
 		end
 	end
-
-	-- Forzar una actualización de color inmediata para los nuevos
+	
 	updateActiveColors()
 end
 
@@ -350,13 +330,13 @@ task.spawn(function()
 				continue
 			end
 		end
-
+			
 		task.wait(0.25)
 	end
 end)
 
 ------------------------------------------------------------
--- ⚡ Eventos (Restaurados a la lógica original de ALTO RENDIMIENTO)
+-- ⚡ Eventos
 ------------------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function()
 	task.wait(0.5)
@@ -364,19 +344,16 @@ LocalPlayer.CharacterAdded:Connect(function()
 		if d.Highlight then d.Highlight.Enabled = false end
 	end
 
-	-- Ejecutar el bucle pesado
 	performScan()
 
 	local char = LocalPlayer.Character
 	local head = getRealHead(char) or getAnyPart(char)
 	if head then
 		local lastPos = head.Position
-		-- Esta es la lógica de alto rendimiento original
 		head:GetPropertyChangedSignal("Position"):Connect(function()
 			local newPos = head.Position
 			if (newPos - lastPos).Magnitude > UPDATE_THRESHOLD then
 				lastPos = newPos
-				-- Ejecutar el bucle pesado solo cuando nos movemos
 				performScan()
 			end
 		end)
@@ -385,7 +362,6 @@ end)
 
 for _, folder in pairs(Folders) do
 	folder.ChildAdded:Connect(function()
-		-- Ejecutar el bucle pesado
 		task.defer(performScan)
 	end)
 	folder.ChildRemoved:Connect(function(model)
@@ -403,23 +379,17 @@ Workspace.DescendantRemoving:Connect(function(obj)
 	end
 end)
 
--- Bucle pesado de 5 segundos (original)
--- Se encarga de "descubrir" objetivos si estamos quietos
 task.spawn(function()
 	while task.wait(5) do
 		performScan()
 	end
 end)
 
--- *** EL NUEVO BUCLE LIGERO ***
--- Se encarga de la SINCRONIZACIÓN DE COLORES
 task.spawn(function()
 	while task.wait(COLOR_UPDATE_INTERVAL) do
-		-- Solo ejecutamos la función ligera
 		updateActiveColors()
 	end
 end)
-
 
 task.defer(function()
 	task.wait(1)
