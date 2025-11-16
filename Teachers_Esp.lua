@@ -217,7 +217,7 @@ local function updateActiveColors()
 end
 
 ------------------------------------------------------------
--- 🎯 Selección de candidatos
+-- 🎯 Selección de candidatos (Corregida)
 ------------------------------------------------------------
 local function buildDesired()
 	local plFolder = detectPlayerFolder()
@@ -233,19 +233,33 @@ local function buildDesired()
 	local myPos = myHead.Position
 
 	for groupName, folder in pairs(Folders) do
+		
+		-- Esta es la ÚNICA comprobación de equipo necesaria.
+		-- Si my = "Teachers", esta línea SOLO será true si groupName = "Alices".
+		-- NUNCA escaneará la carpeta "Teachers".
 		if canSeeTarget(my, groupName) then
+			
 			for _, model in ipairs(folder:GetChildren()) do
-				if model:IsA("Model") and model.Name ~= LocalPlayer.Name then
-					if model.Parent ~= plFolder then
-						local part = getRealHead(model) or getAnyPart(model)
-						if part then
-							local dist = (part.Position - myPos).Magnitude
-							if dist <= MAX_RENDER_DISTANCE then
-								if groupName == "Alices" then
-									table.insert(A, {model=model, distance=dist})
-								else
-									table.insert(T, {model=model, distance=dist})
-								end
+				
+				-- Como canSeeTarget ya filtró, sabemos que CUALQUIER
+				-- modelo aquí es un enemigo.
+				--
+				-- Ya NO necesitamos "model.Parent ~= plFolder"
+				-- Ya NO necesitamos "model.Name ~= LocalPlayer.Name"
+				--
+				-- Es imposible que se cree un Highlight para tu equipo
+				-- porque este bucle NUNCA correrá en tu propia carpeta.
+				
+				if model:IsA("Model") then
+					
+					local part = getRealHead(model) or getAnyPart(model)
+					if part then
+						local dist = (part.Position - myPos).Magnitude
+						if dist <= MAX_RENDER_DISTANCE then
+							if groupName == "Alices" then
+								table.insert(A, {model=model, distance=dist})
+							else
+								table.insert(T, {model=model, distance=dist})
 							end
 						end
 					end
