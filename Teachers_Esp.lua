@@ -29,7 +29,7 @@ local CREATION_INTERVAL = 1
 
 local DISTANCES = {
 	Close = 30,
-	Medium = 70,
+	Medium = 65,
 }
 
 local COLORS = {
