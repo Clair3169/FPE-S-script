@@ -53,8 +53,8 @@ updatePlayerCount()
 -- ============================================================
 
 local dialogueConfig = {
-	{text = "Script in Tester", color = Color3.fromRGB(255, 0, 0)},
-	{text = "", color = Color3.fromRGB(0, 255, 255)},
+	{text = "MD me on Discord: cesartorres6209", color = Color3.fromRGB(255, 0, 0)},
+	{text = "Suggestions?", color = Color3.fromRGB(0, 255, 255)},
 	-- {text = "Otro más", color = Color3.fromRGB(255, 0, 255)},
 }
 
