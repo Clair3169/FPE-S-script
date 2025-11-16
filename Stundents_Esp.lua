@@ -412,23 +412,6 @@ localPlayer.CharacterRemoving:Connect(function()
 end)
 
 ------------------------------------------------------------
--- ♻️ Limpieza global (cuando un descendant se está removiendo)
-------------------------------------------------------------
-Workspace.DescendantRemoving:Connect(function(obj)
-	-- si un modelo se remueve, liberar su highlight si existe
-	if activeHighlights[obj] then
-		local hl = activeHighlights[obj]
-		if hl then
-			hl.Enabled = false
-			hl.Adornee = nil
-			releaseHighlightToPool(hl)
-		end
-		activeHighlights[obj] = nil
-		visibleStudents[obj] = nil
-	end
-end)
-
-------------------------------------------------------------
 -- 🔁 Auto-verificador (elimina referencias huérfanas y reevalúa)
 ------------------------------------------------------------
 task.spawn(function()
