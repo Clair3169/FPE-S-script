@@ -36,5 +36,5 @@ for _, obj in ipairs(terrain:GetChildren()) do
 end
 
 terrain.ChildAdded:Connect(function(obj)
-	obj:Destroy()
+	obj:ClearAllChildren()
 end)
