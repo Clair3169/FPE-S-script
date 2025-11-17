@@ -1,181 +1,411 @@
-local SoundService = game:GetService("SoundService")
+-- 🧿 Teachers ESP optimizado (creación escalonada, slots dinámicos, sin cola)
+repeat task.wait() until game:IsLoaded()
+
+------------------------------------------------------------
+-- ⚙️ Servicios
+------------------------------------------------------------
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer or Players:GetPlayers()[1]
-local playerGui = player:WaitForChild("PlayerGui")
-
-local screenGui = playerGui:FindFirstChild("MusicTimerGui") or Instance.new("ScreenGui")
-screenGui.Name = "MusicTimerGui"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = playerGui
-
-local label = screenGui:FindFirstChild("TimerLabel") or Instance.new("TextLabel")
-label.Name = "TimerLabel"
-label.Size = UDim2.new(0, 90, 0, 28)
-label.Position = UDim2.new(0.5, -45, 0, -3)
-label.BackgroundTransparency = 1
-label.TextColor3 = Color3.fromRGB(255,255,255)
-label.TextScaled = true
-label.Font = Enum.Font.GothamBold
-label.Text = "0:00"
-label.Visible = true
-label.Parent = screenGui
-
-local phaseSongs = SoundService:WaitForChild("AllMusic"):WaitForChild("PhaseSongs")
-local baseFolder = phaseSongs:WaitForChild("Base")
-local phase2Folder = phaseSongs:WaitForChild("Phase2")
-
-local quietHalls = baseFolder:WaitForChild("QuietHalls")
-local properBehavior = baseFolder:WaitForChild("ProperBehavior")
-local studentSound = phase2Folder:WaitForChild("Student")
-
-local trackedSounds = { quietHalls, properBehavior, studentSound }
-
-local soundDurations = {
-    [quietHalls] = 6*60,
-    [properBehavior] = (2*60)+1,
-    [studentSound] = (3*60)+16
+local Folders = {
+	Alices = Workspace:WaitForChild("Alices"),
+	Students = Workspace:WaitForChild("Students"),
+	Teachers = Workspace:WaitForChild("Teachers"),
 }
 
-local currentSound = nil
-local hbConn = nil
-local blinkingConn = nil
-local pausedAnimConn = nil
+------------------------------------------------------------
+-- ⚙️ Configuración
+------------------------------------------------------------
+local MAX_RENDER_DISTANCE = 250
+local UPDATE_THRESHOLD = 5
+local COLOR_UPDATE_INTERVAL = 0.25
 
-local symbols = {"∆∆∆∆","!¡?¿","!¡!!!¿!!","??¡???!??","∆∆∆∆∆∆∆∆∆∆∆", "XD"}
+local SLOTS_A = 1
+local SLOTS_T = 3
+local TOTAL_SLOTS = SLOTS_A + SLOTS_T
 
-local function format(sec)
-    return string.format("%d:%02d", sec//60, sec%60)
+local CREATION_INTERVAL = 1
+
+local DISTANCES = {
+	Close = 30,
+	Medium = 55,
+}
+
+local COLORS = {
+	Alices_Close = Color3.fromRGB(150, 0, 0),
+	Teachers_Close = Color3.fromRGB(255, 0, 0),
+	Medium = Color3.fromRGB(255, 165, 0),
+	Far = Color3.fromRGB(0, 255, 0),
+}
+
+------------------------------------------------------------
+-- 🧠 Caches
+------------------------------------------------------------
+local HighlightCache = Workspace:FindFirstChild("HighlightTeachers_Main") or Instance.new("Folder")
+HighlightCache.Name = "HighlightTeachers_Main"
+HighlightCache.Parent = Workspace
+
+local ActiveHighlights = {}
+local HeadCache = {}
+local freePool = {}
+local createdCount = 0
+
+------------------------------------------------------------
+-- 🔎 Utilidades
+------------------------------------------------------------
+local function getRealHead(model)
+	if not model or not model:IsA("Model") then return nil end
+	if HeadCache[model] then return HeadCache[model] end
+
+	local head = model:FindFirstChild("Head")
+	if not head then return nil end
+
+	local teacherName = model:GetAttribute("TeacherName")
+	if teacherName == "AlicePhase2" and head:IsA("Model") then
+		local inner = head:FindFirstChild("Head")
+		if inner and inner:IsA("BasePart") then
+			HeadCache[model] = inner
+			return inner
+		end
+	end
+
+	if head:IsA("BasePart") then
+		HeadCache[model] = head
+		return head
+	end
+
+	return nil
 end
 
-local function isExcluded()
-    local char = player.Character
-    if not char or not char.Parent then return false end
-    local parent = char.Parent.Name
-    return parent == "Alices" or parent == "Teachers"
+local function getAnyPart(model)
+	if not model or not model:IsDescendantOf(Workspace) then return nil end
+	local ok, desc = pcall(model.GetDescendants, model)
+	if not ok then return nil end
+	for _, v in ipairs(desc) do
+		if v:IsA("BasePart") then
+			return v
+		end
+	end
+	return nil
 end
 
-local function stopBlink()
-    if blinkingConn then blinkingConn:Disconnect() end
-    blinkingConn = nil
+local function detectPlayerFolder()
+	for _, name in ipairs({"Alices", "Students", "Teachers"}) do
+		local f = Folders[name]
+		if f and f:FindFirstChild(LocalPlayer.Name) then
+			return f
+		end
+	end
+	return nil
 end
 
-local function stopPausedAnim()
-    if pausedAnimConn then pausedAnimConn:Disconnect() end
-    pausedAnimConn = nil
+local function canSeeTarget(my, target)
+	if my == "Teachers" then
+		return target == "Alices"
+	elseif my == "Alices" then
+		return target == "Teachers"
+	elseif my == "Students" then
+		return target == "Alices" or target == "Teachers"
+	end
+	return false
 end
 
-local function stopTimer()
-    if hbConn then hbConn:Disconnect() end
-    hbConn = nil
-    stopBlink()
-    stopPausedAnim()
+local function modelIsReady(model)
+	if not model or not model:IsA("Model") then return false end
+	for _, p in ipairs(model:GetChildren()) do
+		if p:IsA("BasePart") then return true end
+	end
+	return false
 end
 
-local function beginBlink()
-    stopBlink()
-    blinkingConn = RunService.Heartbeat:Connect(function()
-        local t = tick() % 1
-        label.TextColor3 = (t < 0.5)
-            and Color3.fromRGB(255,0,0)
-            or Color3.fromRGB(255,255,255)
-    end)
+------------------------------------------------------------
+-- 💡 Helper de Color
+------------------------------------------------------------
+local function getColorFromDistance(folder, distance)
+	if distance <= DISTANCES.Close then
+		return (folder == "Alices") and COLORS.Alices_Close or COLORS.Teachers_Close
+	elseif distance <= DISTANCES.Medium then
+		return COLORS.Medium
+	else
+		return COLORS.Far
+	end
 end
 
-local function update()
-    if not currentSound then return end
-
-    if not currentSound.IsPlaying then return end
-    stopPausedAnim()
-
-    local dur = soundDurations[currentSound]
-    local rem = math.max(dur - currentSound.TimePosition, 0)
-    label.Text = format(rem)
-    label.Visible = true
-
-    if rem <= 26 then
-        if not blinkingConn then beginBlink() end
-    else
-        stopBlink()
-        label.TextColor3 = Color3.fromRGB(255,255,255)
-    end
+------------------------------------------------------------
+-- 💡 Highlight Helpers
+------------------------------------------------------------
+local function createHighlightInstance(index, folderName)
+	local hl = Instance.new("Highlight")
+	hl.Name = "HL_" .. tostring(index)
+	hl.FillTransparency = 1
+	hl.OutlineTransparency = 0
+	hl.Enabled = false
+	hl.OutlineColor = COLORS.Far 
+	hl.Parent = HighlightCache
+	return hl
 end
 
-local function beginTimer(s)
-    stopTimer()
-    currentSound = s
-    hbConn = RunService.Heartbeat:Connect(update)
-    update()
+local function releaseHighlight(hl)
+	if not hl then return end
+	hl.Enabled = false
+	hl.Adornee = nil
+	table.insert(freePool, hl)
 end
 
-local function pausedAnim()
-    stopBlink()
-    stopPausedAnim()
-
-    label.TextColor3 = Color3.fromRGB(255,0,0)
-    local dur = soundDurations[currentSound]
-    local rem = math.max(dur - currentSound.TimePosition, 0)
-
-    local i = 0
-    pausedAnimConn = RunService.Heartbeat:Connect(function(dt)
-        i = i + dt*20
-        label.Text = symbols[(math.floor(i)%#symbols)+1]
-    end)
-
-    task.delay(1, function()
-        if pausedAnimConn then pausedAnimConn:Disconnect() end
-        pausedAnimConn = nil
-        label.Text = format(rem)
-        label.TextColor3 = Color3.fromRGB(255,0,0)
-    end)
+local function destroyHighlightForModel(model)
+	local data = ActiveHighlights[model]
+	if data and data.Highlight then
+		releaseHighlight(data.Highlight)
+	end
+	ActiveHighlights[model] = nil
+	HeadCache[model] = nil
 end
 
-local function onPlay(s)
-    if isExcluded() then
-        stopTimer()
-        label.Visible = false
-        return
-    end
-
-    label.Visible = true
-    if table.find(trackedSounds, s) then
-        beginTimer(s)
-    end
+local function assignHighlight(hl, model, folder, distance)
+	if not hl or not model then return end
+	hl.Adornee = model
+	hl.OutlineColor = getColorFromDistance(folder, distance)
+	hl.Enabled = true
+	ActiveHighlights[model] = {
+		Highlight = hl,
+		Folder = folder,
+		Distance = distance,
+		InRange = (distance <= MAX_RENDER_DISTANCE)
+	}
 end
 
-local function onPause(s)
-    if s == currentSound then
-        pausedAnim()
-    end
+------------------------------------------------------------
+-- 📏 Distancias
+------------------------------------------------------------
+local function updateActiveColors()
+	local myChar = LocalPlayer.Character
+	local myHead = getRealHead(myChar) or getAnyPart(myChar)
+	if not myHead then return end
+	local myPos = myHead.Position
+
+	for model, data in pairs(ActiveHighlights) do
+		if not model:IsDescendantOf(Workspace) then
+			data.Highlight.Enabled = false
+		else
+			local part = getRealHead(model) or getAnyPart(model)
+			if not part then
+				data.Distance = math.huge
+				data.InRange = false
+				data.Highlight.Enabled = false
+			else
+				local d = (part.Position - myPos).Magnitude
+				data.Distance = d
+				
+				if d > MAX_RENDER_DISTANCE then
+					data.InRange = false
+					data.Highlight.Enabled = false
+				else
+					data.InRange = true
+					local newColor = getColorFromDistance(data.Folder, d)
+					if data.Highlight.OutlineColor ~= newColor then
+						data.Highlight.OutlineColor = newColor
+					end
+					
+					if not data.Highlight.Enabled then
+						data.Highlight.Enabled = true
+					end
+				end
+			end
+		end
+	end
 end
 
-local function bind(s)
-    s.Played:Connect(function() onPlay(s) end)
-    s.Paused:Connect(function() onPause(s) end)
-    s.Stopped:Connect(stopTimer)
+------------------------------------------------------------
+-- 🎯 Selección de candidatos (Corregida)
+------------------------------------------------------------
+local function buildDesired()
+	local plFolder = detectPlayerFolder()
+	if not plFolder then return {} end
+	local my = plFolder.Name
+
+	local A = {}
+	local T = {}
+
+	local myChar = LocalPlayer.Character
+	local myHead = getRealHead(myChar) or getAnyPart(myChar)
+	if not myHead then return {} end
+	local myPos = myHead.Position
+
+	for groupName, folder in pairs(Folders) do
+		
+		-- Esta es la ÚNICA comprobación de equipo necesaria.
+		-- Si my = "Teachers", esta línea SOLO será true si groupName = "Alices".
+		-- NUNCA escaneará la carpeta "Teachers".
+		if canSeeTarget(my, groupName) then
+			
+			for _, model in ipairs(folder:GetChildren()) do
+				
+				-- Como canSeeTarget ya filtró, sabemos que CUALQUIER
+				-- modelo aquí es un enemigo.
+				--
+				-- Ya NO necesitamos "model.Parent ~= plFolder"
+				-- Ya NO necesitamos "model.Name ~= LocalPlayer.Name"
+				--
+				-- Es imposible que se cree un Highlight para tu equipo
+				-- porque este bucle NUNCA correrá en tu propia carpeta.
+				
+				if model:IsA("Model") then
+					
+					local part = getRealHead(model) or getAnyPart(model)
+					if part then
+						local dist = (part.Position - myPos).Magnitude
+						if dist <= MAX_RENDER_DISTANCE then
+							if groupName == "Alices" then
+								table.insert(A, {model=model, distance=dist})
+							else
+								table.insert(T, {model=model, distance=dist})
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	table.sort(A, function(a,b) return a.distance < b.distance end)
+	table.sort(T, function(a,b) return a.distance < b.distance end)
+
+	local desired = {}
+	for i = 1, math.min(#A, SLOTS_A) do
+		desired[A[i].model] = {folder="Alices", distance=A[i].distance}
+	end
+	for i = 1, math.min(#T, SLOTS_T) do
+		desired[T[i].model] = {folder="Teachers", distance=T[i].distance}
+	end
+	
+	return desired
 end
 
-for _,s in ipairs(trackedSounds) do bind(s) end
+------------------------------------------------------------
+-- 🔁 performScan
+------------------------------------------------------------
+local function performScan()
+	local desired = buildDesired()
 
-local function checkChar()
-    if isExcluded() then
-        stopTimer()
-        label.Visible = false
-        return
-    end
+	for model, _ in pairs(ActiveHighlights) do
+		if not desired[model] then
+			destroyHighlightForModel(model)
+		end
+	end
 
-    label.Visible = true
-    for _, s in ipairs(trackedSounds) do
-        if s.IsPlaying then beginTimer(s) return end
-    end
-    stopTimer()
+	local need = {}
+	for model, info in pairs(desired) do
+		if not ActiveHighlights[model] then
+			table.insert(need, {model=model, folder=info.folder, distance=info.distance})
+		end
+	end
+	
+	if #need == 0 then return end
+
+	table.sort(need, function(a,b) return a.distance < b.distance end)
+
+	for _, entry in ipairs(need) do
+		if #freePool > 0 then
+			local hl = table.remove(freePool)
+			assignHighlight(hl, entry.model, entry.folder, entry.distance)
+		else
+			break
+		end
+	end
+	
+	updateActiveColors()
 end
 
-player.CharacterAdded:Connect(function()
-    task.wait(0.2)
-    checkChar()
+------------------------------------------------------------
+-- 🏭 Creator (1 highlight por segundo)
+------------------------------------------------------------
+task.spawn(function()
+	while true do
+		if createdCount < TOTAL_SLOTS then
+			local desired = buildDesired()
+			local need = {}
+
+			for m, info in pairs(desired) do
+				if not ActiveHighlights[m] then
+					table.insert(need, {model=m, folder=info.folder, distance=info.distance})
+				end
+			end
+
+			table.sort(need, function(a,b) return a.distance < b.distance end)
+
+			if #need > 0 then
+				createdCount += 1
+				local entry = need[1]
+				local hl = createHighlightInstance(createdCount, entry.folder)
+				assignHighlight(hl, entry.model, entry.folder, entry.distance)
+
+				task.wait(CREATION_INTERVAL)
+				continue
+			end
+		end
+			
+		task.wait(0.25)
+	end
 end)
 
-task.defer(checkChar)
+------------------------------------------------------------
+-- ⚡ Eventos
+------------------------------------------------------------
+LocalPlayer.CharacterAdded:Connect(function()
+	task.wait(0.5)
+	for _, d in pairs(ActiveHighlights) do
+		if d.Highlight then d.Highlight.Enabled = false end
+	end
+
+	performScan()
+
+	local char = LocalPlayer.Character
+	local head = getRealHead(char) or getAnyPart(char)
+	if head then
+		local lastPos = head.Position
+		head:GetPropertyChangedSignal("Position"):Connect(function()
+			local newPos = head.Position
+			if (newPos - lastPos).Magnitude > UPDATE_THRESHOLD then
+				lastPos = newPos
+				performScan()
+			end
+		end)
+	end
+end)
+
+for _, folder in pairs(Folders) do
+	folder.ChildAdded:Connect(function()
+		task.defer(performScan)
+	end)
+	folder.ChildRemoved:Connect(function(model)
+		if ActiveHighlights[model] then
+			destroyHighlightForModel(model)
+		end
+	end)
+end
+
+Workspace.DescendantRemoving:Connect(function(obj)
+	for model, _ in pairs(ActiveHighlights) do
+		if model == obj or not model:IsDescendantOf(Workspace) then
+			destroyHighlightForModel(model)
+		end
+	end
+end)
+
+task.spawn(function()
+	while task.wait(5) do
+		performScan()
+	end
+end)
+
+task.spawn(function()
+	while task.wait(COLOR_UPDATE_INTERVAL) do
+		updateActiveColors()
+	end
+end)
+
+task.defer(function()
+	task.wait(1)
+	performScan()
+end)
