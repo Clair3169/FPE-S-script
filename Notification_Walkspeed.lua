@@ -58,7 +58,7 @@ local function LoadScriptRobusto(url)
         if not runSuccess then
             warn("⚠️ [EJECUCIÓN] Error al correr el script:", url, "\n", runErr)
         else
-            -- XDDDDD
+            -- XDDD
         end
     end)
 end
