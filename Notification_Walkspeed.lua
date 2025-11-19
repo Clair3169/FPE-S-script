@@ -2,7 +2,7 @@ local player = game.Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
 local SoundService = game:GetService("SoundService")
 local warningSound = Instance.new("Sound")
-warningSound.SoundId = "rbxassetid://104980570072214"-- <-- ¡Recuerda cambiar este ID!
+warningSound.SoundId = "rbxassetid://104980570072214" -- <-- ¡Recuerda cambiar este ID!
 warningSound.Volume = 1
 warningSound.Parent = SoundService
 
@@ -14,10 +14,63 @@ warningSound.Ended:Connect(function()
     warningSound:Destroy()
 end)
 
+-- ----------------------------------------------------
+-- LISTA DE URLs RAW (Tal cual aparecen en GitHub)
+-- ----------------------------------------------------
+local RAW_URLS_TO_LOAD = {
+    "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Walkspeed.lua",
+    "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Notification_Warning.lua"
+}
+
+-- ----------------------------------------------------
+-- FUNCIÓN DE CARGA ROBUSTA (Anti-Caché, Anti-Nil Value, Paralela)
+-- ----------------------------------------------------
+local function LoadScriptRobusto(url)
+    task.spawn(function()
+        -- 1. Anti-Caché: Agregamos un parámetro aleatorio para actualización instantánea
+        local cleanUrl = url .. "?nocache=" .. tostring(math.random(1, 1000000))
+        
+        -- 2. Descarga Segura
+        local success, content = pcall(function()
+            return game:HttpGet(cleanUrl, true)
+        end)
+
+        if not success then
+            warn("❌ [RED] Fallo al descargar: " .. url)
+            return
+        end
+
+        -- 3. Verificación de contenido
+        if type(content) ~= "string" or #content < 10 then
+            warn("⚠️ [VACÍO] El script descargado parece estar vacío o roto: " .. url)
+            return
+        end
+
+        -- 4. Compilación (Evita el error 'attempt to call a nil value')
+        local func, loadErr = loadstring(content)
+        if not func then
+            warn("❌ [SINTAXIS] Error en el código del script externo:", url, "\n", loadErr)
+            return
+        end
+
+        -- 5. Ejecución Protegida
+        local runSuccess, runErr = pcall(func)
+        if not runSuccess then
+            warn("⚠️ [EJECUCIÓN] Error al correr el script:", url, "\n", runErr)
+        else
+            -- XDDDDD
+        end
+    end)
+end
+
 bindableFunction.OnInvoke = function(buttonClicked)
 	if buttonClicked == "Yes" then
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Walkspeed.lua", true))()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Notification_Warning.lua", true))()
+        
+        -- Ejecuta la lista de scripts de forma segura y paralela
+        for _, rawUrl in ipairs(RAW_URLS_TO_LOAD) do
+            LoadScriptRobusto(rawUrl)
+        end
+        
 	elseif buttonClicked == "No" then
 		-- no se hace nada
 	end
