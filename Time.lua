@@ -43,7 +43,7 @@ local studentSound = phase2Folder:WaitForChild("Student")
 local trackedSounds = { quietHalls, properBehavior, studentSound }
 
 local soundDurations = {
-	[quietHalls] = (6*60)+11,
+	[quietHalls] = (6*60)+9,
 	[properBehavior] = (2*60)+5,
 	[studentSound] = (3*60)+16
 }
