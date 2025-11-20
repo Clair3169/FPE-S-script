@@ -1,76 +1,81 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
+-- === CONFIGURACIÓN ===
 
--- 🔧 Valores base
-local MIN_ZOOM = 4
-local MAX_ZOOM = 4
-local ALICE_MIN_ZOOM = 8
-local ALICE_MAX_ZOOM = 10
+local ALICE_ZOOM_MIN = 6
+local ALICE_ZOOM_MAX = 15
 
--- Estado
-local isAlicePhase2 = false
-local thirdPersonEnabled = true
-local aliceFree = false
+local NORMAL_ZOOM_MIN = 4
+local NORMAL_ZOOM_MAX = 4
 
--- 🟩 Forzar cámara en tercera persona (ahora usa los valores actuales del jugador)
-local function forceThirdPerson()
-	local character = player.Character
-	if not character then return end
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
+local MODO_CAMARA = Enum.CameraMode.Classic
+local TOUCH_MODO_CAMARA = Enum.DevTouchCameraMovementMode.Classic
+local NOMBRE_CARPETA_ESPECIAL = "Alices"
 
-	camera.CameraType = Enum.CameraType.Custom
-	camera.CameraSubject = humanoid
-	player.CameraMode = Enum.CameraMode.Classic
+-- ======================
 
-	-- 👇 Ya no forzamos MIN_ZOOM/MAX_ZOOM aquí.
-	-- Así respeta el zoom configurado según el estado Alice o normal.
+local function obtenerConfiguracionActual()
+	local character = LocalPlayer.Character
+	
+	if character and character.Parent and character.Parent.Name == NOMBRE_CARPETA_ESPECIAL then
+		return ALICE_ZOOM_MIN, ALICE_ZOOM_MAX
+	else
+		return NORMAL_ZOOM_MIN, NORMAL_ZOOM_MAX
+	end
 end
 
--- 🔍 Detección del estado AlicePhase2
-local function updateAliceState()
-	local folder = Workspace:FindFirstChild("Alices")
-	if not folder then
-		isAlicePhase2 = false
-		return
+local function forzarConfiguracion()
+	local targetMin, targetMax = obtenerConfiguracionActual()
+
+	-- Forzar cámara Classic
+	if LocalPlayer.CameraMode ~= MODO_CAMARA then
+		LocalPlayer.CameraMode = MODO_CAMARA
 	end
 
-	local model = folder:FindFirstChild(player.Name)
-	if not model then
-		isAlicePhase2 = false
-		return
+	-- Forzar DevTouchCameraMode Classic
+	if LocalPlayer.DevTouchCameraMode ~= TOUCH_MODO_CAMARA then
+		LocalPlayer.DevTouchCameraMode = TOUCH_MODO_CAMARA
 	end
 
-	local attrValue = model:GetAttribute("TeacherName")
-	isAlicePhase2 = (attrValue == "AlicePhase2")
+	-- Forzar Zoom
+	if LocalPlayer.CameraMaxZoomDistance ~= targetMax then
+		LocalPlayer.CameraMaxZoomDistance = targetMax
+	end
+	if LocalPlayer.CameraMinZoomDistance ~= targetMin then
+		LocalPlayer.CameraMinZoomDistance = targetMin
+	end
 end
 
--- 🔁 Actualización periódica
-task.spawn(function()
-	while true do
-		updateAliceState()
+local function conectarPersonaje(character)
+	forzarConfiguracion()
 
-		if isAlicePhase2 and not aliceFree then
-			-- 📏 Aplicar zoom de AlicePhase2
-			player.CameraMinZoomDistance = ALICE_MIN_ZOOM
-			player.CameraMaxZoomDistance = ALICE_MAX_ZOOM
-			forceThirdPerson()
-			task.delay(15, function() aliceFree = true end)
-
-		elseif not isAlicePhase2 then
-			aliceFree = false
-			-- 📏 Restaurar zoom normal
-			player.CameraMinZoomDistance = MIN_ZOOM
-			player.CameraMaxZoomDistance = MAX_ZOOM
-			if thirdPersonEnabled then
-				forceThirdPerson()
-			end
+	-- Cambio de carpeta
+	character.AncestryChanged:Connect(function(_, parent)
+		if parent then
+			forzarConfiguracion()
 		end
+	end)
+end
 
-		task.wait(0.5)
+-- Listeners anti-cambio externo
+LocalPlayer:GetPropertyChangedSignal("CameraMode"):Connect(forzarConfiguracion)
+LocalPlayer:GetPropertyChangedSignal("CameraMinZoomDistance"):Connect(forzarConfiguracion)
+LocalPlayer:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(forzarConfiguracion)
+
+-- Detectar intento de cambiar DevTouchCameraMode
+LocalPlayer:GetPropertyChangedSignal("DevTouchCameraMode"):Connect(function()
+	if LocalPlayer.DevTouchCameraMode ~= TOUCH_MODO_CAMARA then
+		LocalPlayer.DevTouchCameraMode = TOUCH_MODO_CAMARA
 	end
 end)
+
+-- Respawn
+LocalPlayer.CharacterAdded:Connect(conectarPersonaje)
+
+-- Inicial
+if LocalPlayer.Character then
+	conectarPersonaje(LocalPlayer.Character)
+else
+	forzarConfiguracion()
+end
