@@ -25,7 +25,7 @@ local coloresRainbow = {
 
 -- 3. Configuración de la animación (Info)
 -- Tiempo: 2 segundos para pasar de un color a otro
-local tweenInfo = TweenInfo.new(4, Enum.EasingStyle.Linear) 
+local tweenInfo = TweenInfo.new(6, Enum.EasingStyle.Linear) 
 
 -- 4. Función recursiva para cambiar el color
 local colorActual = 0
@@ -47,5 +47,3 @@ end
 
 -- 5. Iniciar la cadena
 siguienteColor()
-
-print("Plataforma Neón creada y animada con TweenService (Sin bucles).")
