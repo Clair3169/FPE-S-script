@@ -26,7 +26,7 @@ label.TextScaled = true
 label.Font = Enum.Font.GothamBold
 label.Text = "0:00"
 label.Visible = true
-label.ZIndex = 100
+label.ZIndex = 500
 label.Parent = screenGui
 
 ---------------------------------------------------------------------
@@ -161,6 +161,12 @@ local function updateTimerLogic()
 		end
 		
 		if not foundPaused then
+			-- ✅ CORRECCIÓN APLICADA AQUÍ
+			-- Si ya estamos parpadeando (0:00), salimos inmediatamente para no recalcular
+			-- el "tiempo fantasma" (los 9s, 5s, etc).
+			if zeroBlinkConn then return end
+			-----------------------------------------------------------------
+
 			if currentSound and soundDurations[currentSound] then
 				if not ghostStart then
 					ghostStart = tick()
