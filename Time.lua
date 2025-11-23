@@ -13,7 +13,7 @@ local screenGui = playerGui:FindFirstChild("TimerGui") or Instance.new("ScreenGu
 screenGui.Name = "TimerGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 20
 screenGui.Parent = playerGui
 
 local label = screenGui:FindFirstChild("TimerLabel") or Instance.new("TextLabel")
@@ -26,7 +26,6 @@ label.TextScaled = true
 label.Font = Enum.Font.GothamBold
 label.Text = "0:00"
 label.Visible = true
-label.ZIndex = 500
 label.Parent = screenGui
 
 ---------------------------------------------------------------------
