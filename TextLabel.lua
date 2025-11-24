@@ -54,7 +54,7 @@ updatePlayerCount()
 -- ============================================================
 -- Posición: -15 px (Justo encima de Players)
 local pingLabel = createLabel("Ping: 0", Color3.fromRGB(255, 255, 255), UDim2.new(0, 2, 1, -15))
-pingLabel.TextTransparency = 0.50 -- El ping se ve mejor totalmente opaco
+pingLabel.TextTransparency = 0.3 -- El ping se ve mejor totalmente opaco
 
 -- Referencia directa al valor de Ping
 local performanceStats = stats:WaitForChild("Network"):WaitForChild("ServerStatsItem"):WaitForChild("Data Ping")
