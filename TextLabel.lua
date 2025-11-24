@@ -54,7 +54,7 @@ updatePlayerCount()
 -- ============================================================
 -- Posición: -15 px (Justo encima de Players)
 local pingLabel = createLabel("Ping: 0", Color3.fromRGB(255, 255, 255), UDim2.new(0, 2, 1, -15))
-pingLabel.TextTransparency = 0.70 -- El ping se ve mejor totalmente opaco
+pingLabel.TextTransparency = 0.50 -- El ping se ve mejor totalmente opaco
 
 -- Referencia directa al valor de Ping
 local performanceStats = stats:WaitForChild("Network"):WaitForChild("ServerStatsItem"):WaitForChild("Data Ping")
@@ -70,7 +70,7 @@ local function updatePingRecursive()
 	elseif pingInt < 100 then
 		pingLabel.TextColor3 = Color3.fromRGB(0, 255, 0) -- Verde
 	elseif pingInt < 250 then
-		pingLabel.TextColor3 = Color3.fromRGB(255, 170, 0) -- Naranja
+		pingLabel.TextColor3 = Color3.fromRGB(247, 241, 141) -- Amarillo
 	else
 		pingLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- Rojo
 	end
