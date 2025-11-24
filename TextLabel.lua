@@ -37,7 +37,7 @@ end
 -- 🔹 1. Contador de Jugadores
 -- ============================================================
 -- Posición: Base (0 px)
-local playerCountLabel = createLabel("Players: 0", Color3.fromRGB(0, 255, 0), UDim2.new(0, 2, 1, 0))
+local playerCountLabel = createLabel("Players: 0", Color3.fromRGB(0, 255, 0), UDim2.new(0, 2, 1, -40))
 playerCountLabel.Name = "PlayerCountLabel"
 
 local function updatePlayerCount()
@@ -53,7 +53,7 @@ updatePlayerCount()
 -- 🔹 2. Ping Monitor (Agregado del script nuevo)
 -- ============================================================
 -- Posición: -15 px (Justo encima de Players)
-local pingLabel = createLabel("Ping: 0", Color3.fromRGB(255, 255, 255), UDim2.new(0, 2, 1, -15))
+local pingLabel = createLabel("Ping: 0", Color3.fromRGB(255, 255, 255), UDim2.new(0, 2, 1, -55))
 pingLabel.TextTransparency = 0.3 -- El ping se ve mejor totalmente opaco
 
 -- Referencia directa al valor de Ping
@@ -98,7 +98,7 @@ local spacing = 1
 
 -- ⚠️ CAMBIO IMPORTANTE:
 -- Antes el baseY era -15. Ahora es -35 para dejar espacio al Ping que insertamos.
-local baseY = -35 
+local baseY = -72
 local offset = labelHeight + spacing 
 
 for i, config in ipairs(dialogueConfig) do
