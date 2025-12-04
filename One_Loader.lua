@@ -29,7 +29,9 @@ local urls_raw = {
     "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_Camera.lua",
     "https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/NO_RAGDOLL.lua",
 	"https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Anti_VoidPart.lua",
-	"https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Auto_Block.lua"
+	"https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Auto_Block.lua",
+	"https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Auto_BuyItem.lua",
+	"https://raw.githubusercontent.com/Clair3169/FPE-S-script/refs/heads/main/Auto_Health.lua
 }
 
 -- ----------------------------------------------------
